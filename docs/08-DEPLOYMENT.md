@@ -53,6 +53,15 @@ four migration files in the SQL editor in order.
 Come back here once **Table Editor** shows `clients`, `messages`, `projects` and
 `playbooks`.
 
+This has already been checked against your project. All four migrations are
+applied and verified: `clients`, `messages`, `threads`, `projects`, `playbooks`,
+`client_facts`, `research_notes`, `ai_runs` and `attachments` all respond, the
+Phase 2 columns (`messages.channel`, `messages.sent_at`) are present, the Phase
+2.1 objects (`client_overview.stage_rank`, `client_overview.last_message_at`,
+`pending_followups`) are present, and the search function `search_messages`
+returns without error. Nothing else needs running in the SQL editor except the
+conversation import in Step 6.
+
 ## Step 3: Create your account BEFORE switching the lock on
 
 This is the step that locks people out, so read it twice.
@@ -66,7 +75,14 @@ correct order is:
    and `ALLOWED_EMAIL` empty.
 3. Open your deployed `/setup` page and create your account. Use a password of
    12 characters or more. It is the only account this system will ever have.
-4. If Supabase sends a confirmation email, click the link before signing in.
+4. Supabase will email you a confirmation link. Confirmation is switched on in
+   your project, so the link must be clicked before you can sign in. Two things
+   worth knowing: the built-in email sender is rate limited and often lands in
+   spam, so check that folder. If it does not arrive, you can skip the step
+   entirely: Authentication, Sign In / Providers, Email, turn off **Confirm
+   email**, then create the account again. For a single owner account you
+   control, that is reasonable. The alternative is connecting your own SMTP
+   sender, which is unnecessary here.
 5. Now come back and set `ALLOWED_EMAIL` to that address and `ALLOW_SIGNUP=false`,
    then redeploy.
 
@@ -162,12 +178,17 @@ Honest answer to "is everything checked".
 | Session cookie hardening | Verified live over both HTTP and HTTPS |
 | Import against a real database | Exact match, and idempotent |
 | Built and served in production mode | Verified, all screens render |
+| Connection to your real Supabase | Verified against project `qtsndukhlchymsldvuet` |
+| All four migrations applied | Verified object by object against the live database |
+| Signup readiness for your account | Verified: signup on, email provider on, confirmation on |
 
 What is **not** verified, and cannot be from here:
 
 - Anything on Vercel. I have no access to your account, so the deployment itself
   is unverified until you do it. The build is proven to work; the hosting is not.
-- Anything against your real Supabase project. It does not exist yet.
+- Your account itself. It does not exist yet, so the signed in screens have not
+  run against your real data. The app is correctly refusing access and sending
+  you to `/setup` until you create it.
 - The AI features. Those are Phase 3 onwards and are not written yet. Right now
   the app stores and searches your conversations, and it does not yet draft
   replies.
