@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Getting into Hamza Assistant</title>
+<style>
+  :root {
+    --brand: #1d4ed8;
+    --brand-deep: #0a1b4d;
+    --gold: #c08a2e;
+    --ink: #0b0d12;
+    --ink-soft: #4b5563;
+    --line: #e5e7eb;
+    --canvas: #f4f6fb;
+    --surface: #ffffff;
+    --warn: #b45309;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 28px 18px 60px;
+    background: var(--canvas);
+    color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 26px; letter-spacing: -0.02em; margin: 0 0 6px; }
+  .sub { color: var(--ink-soft); margin: 0 0 26px; }
+  .eyebrow {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.09em;
+    text-transform: uppercase; color: var(--gold); margin: 0 0 8px;
+  }
+  .card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 14px; padding: 20px 22px; margin: 0 0 18px;
+  }
+  .card.recommended { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(29,78,216,.08); }
+  .card h2 { font-size: 18px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .card .why { color: var(--ink-soft); font-size: 14px; margin: 0 0 16px; }
+  ol { margin: 0; padding: 0 0 0 22px; }
+  ol li { margin: 0 0 14px; padding-left: 4px; }
+  ol li:last-child { margin-bottom: 0; }
+  .where {
+    display: block; font-size: 13px; font-weight: 600; color: var(--brand-deep);
+    margin-bottom: 2px;
+  }
+  code {
+    background: #eef2ff; border: 1px solid #dbe3f8; border-radius: 5px;
+    padding: 1px 6px; font-size: 13.5px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    word-break: break-word;
+  }
+  .pill {
+    display: inline-block; background: var(--brand); color: #fff;
+    border-radius: 999px; padding: 2px 10px; font-size: 12px;
+    font-weight: 600; margin-left: 8px; vertical-align: 1px;
+  }
+  .note {
+    border-left: 3px solid var(--gold); background: #fffbf2;
+    padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 18px 0 0;
+    font-size: 14.5px;
+  }
+  .note b { color: var(--warn); }
+  .hint { font-size: 14px; color: var(--ink-soft); margin: 6px 0 0; }
+  .link {
+    display: block; background: var(--brand-deep); color: #fff; text-decoration: none;
+    border-radius: 10px; padding: 12px 16px; margin: 10px 0 0;
+    font-size: 14px; font-weight: 600; word-break: break-all;
+  }
+  .done {
+    border-top: 1px solid var(--line); margin-top: 26px; padding-top: 20px;
+    font-size: 15px;
+  }
+  .done h2 { font-size: 17px; margin: 0 0 10px; }
+  .done ul { margin: 0; padding-left: 20px; }
+  .done li { margin-bottom: 7px; }
+  strong.k { color: var(--brand-deep); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="eyebrow">Hamza Assistant</p>
+  <h1>Getting into your app</h1>
+  <p class="sub">Two ways. The first is shorter and I recommend it. Follow one only.</p>
+
+  <div class="card recommended">
+    <h2>Way 1: create the account in Supabase <span class="pill">Recommended</span></h2>
+    <p class="why">Skips <code>ALLOW_SIGNUP</code> completely, and skips the confirmation email step. About three minutes.</p>
+
+    <ol>
+      <li>
+        <span class="where">Supabase, left sidebar</span>
+        Click <strong class="k">Authentication</strong>, then <strong class="k">Users</strong>.
+      </li>
+      <li>
+        <span class="where">Top right of that page</span>
+        Click <strong class="k">Add user</strong> and choose <strong class="k">Create new user</strong>.
+      </li>
+      <li>
+        <span class="where">In the form</span>
+        Type your <strong class="k">email</strong> and a <strong class="k">password</strong> of at least
+        12 characters. Type the password into your phone's password manager too, because
+        this is the password you will sign in with.
+        <p class="hint">Turn <strong class="k">Auto Confirm User</strong> ON. That is what avoids the
+        confirmation email entirely. If you leave it off you will get stuck waiting for an email
+        that Supabase's free sender often never delivers.</p>
+      </li>
+      <li>
+        <span class="where">Same page, click Create user</span>
+        Done. Your account exists. The database automatically creates your profile and all nine
+        playbooks the moment the account appears.
+      </li>
+      <li>
+        <span class="where">Vercel, a different tab</span>
+        Open <strong class="k">Settings</strong>, then <strong class="k">Environment Variables</strong>,
+        and add one variable:
+        <p class="hint">
+          Name: <code>ALLOWED_EMAIL</code><br>
+          Value: the same email you just used<br>
+          Tick Production, Preview and Development, then Save.
+        </p>
+      </li>
+      <li>
+        <span class="where">Vercel, top menu</span>
+        Open <strong class="k">Deployments</strong>, click the <strong class="k">...</strong> menu on the
+        newest one, and click <strong class="k">Redeploy</strong>.
+        <p class="hint">This step is not optional. Vercel does not apply new variables to a
+        deployment that already exists.</p>
+      </li>
+      <li>
+        <span class="where">Your site</span>
+        Open it and you will land on the sign in page. Enter the email and password you chose
+        in step 3. You are in.
+      </li>
+    </ol>
+
+    <a class="link" href="https://vercel.com/ecom-hamza/hamza-assistant/settings/environment-variables">
+      vercel.com/ecom-hamza/hamza-assistant/settings/environment-variables
+    </a>
+  </div>
+
+  <div class="card">
+    <h2>Way 2: use the app's own setup page</h2>
+    <p class="why">The original plan. It works, but it takes two environment changes and you have to
+    wait for a confirmation email.</p>
+
+    <ol>
+      <li>
+        <span class="where">Vercel, Settings, Environment Variables</span>
+        Find <code>ALLOW_SIGNUP</code> in the list. If it is there, click the
+        <strong class="k">...</strong> on its row and choose <strong class="k">Edit</strong>, then set the
+        value to <code>true</code>. If it is not there, click
+        <strong class="k">Add New</strong> and create it.
+        <p class="hint">Exactly <code>true</code>. Lowercase, nothing else. Tick all three
+        environments, then Save.</p>
+      </li>
+      <li>
+        <span class="where">Vercel, Deployments</span>
+        Redeploy the newest deployment.
+      </li>
+      <li>
+        <span class="where">Your site, the address bar</span>
+        Go to <code>/setup</code> and create your account. 12 characters or more.
+      </li>
+      <li>
+        <span class="where">Your inbox</span>
+        Supabase emails you a confirmation link. Click it. Check spam. If it never arrives,
+        go back to Way 1 instead of waiting.
+      </li>
+      <li>
+        <span class="where">Vercel, Environment Variables</span>
+        Now set <code>ALLOWED_EMAIL</code> to your address, change <code>ALLOW_SIGNUP</code>
+        to <code>false</code>, and redeploy one more time.
+      </li>
+    </ol>
+
+    <div class="note">
+      <b>Why the second environment change?</b> While <code>ALLOW_SIGNUP</code> is true, the app is
+      still ready to accept a new account. Turning it off, and naming your email in
+      <code>ALLOWED_EMAIL</code>, is what makes the system private to you and refuses every
+      other address. Way 1 gets both of those done in a single change.
+    </div>
+  </div>
+
+  <div class="done">
+    <h2>What you should see afterwards</h2>
+    <ul>
+      <li>The sign in page stops showing the yellow warning.</li>
+      <li>Signing in lands you on <strong class="k">Today</strong>, an empty dashboard.</li>
+      <li>Every page has a bottom bar on your phone. It works from anywhere.</li>
+    </ul>
+
+    <h2>Then, and this is the good part</h2>
+    <ul>
+      <li>
+        In Supabase, open <strong class="k">SQL Editor</strong>, paste the whole of
+        <code>instagram-import-engaged.sql</code> from your Drive, and run it.
+      </li>
+      <li>
+        Thirty nine conversations and 762 messages land in the app. The client list fills up,
+        search works, and Today starts telling you who is waiting on a reply.
+      </li>
+      <li>
+        If anything looks wrong, send me a screenshot and I will read it from here.
+      </li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>
