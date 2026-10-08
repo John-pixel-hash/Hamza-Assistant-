@@ -135,6 +135,43 @@ Two warnings that matter:
 6. Open the URL Vercel gives you. You will land on `/login`, then `/setup` while
    no account exists.
 
+## If every page returns 404
+
+Symptom: the deployment says **Ready**, but opening the site shows a "this page
+does not exist" page, and every route 404s including `/api/health`.
+
+What it means: Vercel did not run a Next.js build. It treated the upload as a
+folder of static files, found no `index.html`, and returned its own 404 for
+everything. This happens when you deploy by dragging files in, because drag and
+drop does not always detect the framework the way a Git import does.
+
+How to confirm it is this and not something else:
+
+```bash
+curl -sI https://your-app.vercel.app/ | grep -iE "content-type|x-vercel-error"
+```
+
+An `x-vercel-error: NOT_FOUND` with `content-type: text/plain` is Vercel itself
+answering. A working deployment returns `text/html` and no `x-vercel-error`.
+
+The fix, in the Vercel dashboard:
+
+1. Open the project, then **Settings**.
+2. Open **Build and Deployment**.
+3. Under **Framework Preset**, change it from **Other** (or None) to **Next.js**.
+4. Check **Root Directory** is empty, or `./`. If the files were dragged in from a
+   folder that contained another folder, point this at the inner one instead.
+5. Go to **Deployments**, open the menu on the newest deployment, and click
+   **Redeploy**.
+
+Then set the environment variables from Step 4 if you have not, and redeploy once
+more. Without them the app runs but shows "the database is not reachable",
+because it has no project to talk to.
+
+The reliable way to avoid this whole class of problem is Step 1: connect the
+GitHub repository. Vercel reads the framework from the project itself, and every
+push to `main` deploys automatically.
+
 ## Step 5: Turn the lock on, then test it
 
 1. Claim your account as described in Step 3.
