@@ -68,7 +68,26 @@ export const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? 'Hamza Assistant';
 
 export const ALLOWED_EMAIL = (firstFilled(process.env.ALLOWED_EMAIL) ?? '').toLowerCase();
 
-export const ALLOW_SIGNUP = process.env.ALLOW_SIGNUP === 'true';
+
+/**
+ * Reads a yes/no setting the way a person actually types it.
+ *
+ * This started as `=== 'true'`, which is strict enough to be a trap. Typing
+ * "True", "TRUE", " true" or "true " all read as false, and the app then sits
+ * on the login screen saying setup is disabled while the user is looking at a
+ * variable they believe they set correctly. Environment variables are typed by
+ * hand, so the parsing has to be forgiving.
+ *
+ * Anything genuinely unrecognised is false. A flag is never turned on by a
+ * value nobody intended as yes.
+ */
+export function isEnabledFlag(value: string | undefined | null): boolean {
+  if (typeof value !== 'string') return false;
+  const normalised = value.trim().replace(/^["']|["']$/g, '').toLowerCase();
+  return normalised === 'true' || normalised === '1' || normalised === 'yes' || normalised === 'on';
+}
+
+export const ALLOW_SIGNUP = isEnabledFlag(process.env.ALLOW_SIGNUP);
 
 export const DEFAULT_AI_PROVIDER = process.env.DEFAULT_AI_PROVIDER ?? 'google';
 

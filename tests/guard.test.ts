@@ -232,3 +232,18 @@ test('hosted detection does not depend on a single variable', async () => {
   assert.equal(isHostedOnVercel({ VERCEL: 'no' }), false);
   assert.equal(isHostedOnVercel({ VERCEL_ENV: '' }), false);
 });
+
+test('flag settings are read the way people type them', async () => {
+  const { isEnabledFlag } = await import('../lib/env.ts');
+
+  // The trap this closes: `=== 'true'` reads every one of these as off, and the
+  // app then refuses setup while the user looks at a variable they set.
+  for (const yes of ['true', 'True', 'TRUE', ' true', 'true ', '"true"', "'true'", '1', 'yes', 'on', 'ON']) {
+    assert.equal(isEnabledFlag(yes), true, `${JSON.stringify(yes)} should switch the flag on`);
+  }
+
+  // Nothing unrecognised may ever switch a flag on.
+  for (const no of ['false', 'False', 'FALSE', '0', 'no', 'off', '', '   ', 'tru', 'yess', '2', undefined, null]) {
+    assert.equal(isEnabledFlag(no), false, `${JSON.stringify(no)} should stay off`);
+  }
+});

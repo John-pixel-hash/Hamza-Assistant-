@@ -54,15 +54,28 @@ export default async function LoginPage({
 
       {SUPABASE_CONFIGURED && !ALLOWED_EMAIL && (
         <div className="alert alert-warn mb-5">
-          No owner is configured yet, so sign in is locked.{' '}
+          <p className="font-medium">No account exists yet, so sign in is locked.</p>
           {ALLOW_SIGNUP ? (
-            <Link className="underline" href="/setup">
-              Create your account
-            </Link>
+            <p className="mt-1">
+              <Link className="underline" href="/setup">
+                Create your account
+              </Link>{' '}
+              to claim this system. It is the only account it will ever have.
+            </p>
           ) : (
-            'Set ALLOWED_EMAIL and enable setup first.'
+            <>
+              <p className="mt-1">
+                Claiming an account is switched off, so there is no way in. Set{' '}
+                <code>ALLOW_SIGNUP=true</code> and redeploy, then open{' '}
+                <code>/setup</code> to create the account.
+              </p>
+              <p className="mt-2 text-sm">
+                {ON_VERCEL
+                  ? 'Change it in Vercel under Settings, Environment Variables, then redeploy. Vercel does not read a .env.local file.'
+                  : 'Change it in .env.local, then restart the server.'}
+              </p>
+            </>
           )}
-          .
         </div>
       )}
 
