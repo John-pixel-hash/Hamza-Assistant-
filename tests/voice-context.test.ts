@@ -42,6 +42,20 @@ test('a Fiverr-sourced client keeps Fiverr rules wherever the chat happens', asy
   assert.ok(!instagramLead.includes('came from Fiverr'));
 });
 
+test('the catalogue and its prices are in the prompt, and nothing outside it is offered', async () => {
+  const { buildVoicePrompt } = await import('../lib/ai/voice.ts');
+  const prompt = buildVoicePrompt({ channel: 'instagram' });
+
+  assert.match(prompt, /the complete list of what he sells/);
+  assert.match(prompt, /Full Shopify store build: \$80/);
+  assert.match(prompt, /Product research, 3 to 5 vetted products with supplier links: \$20/);
+  assert.match(prompt, /logo, two concepts with revisions: \$30/);
+  assert.match(prompt, /WordPress site: quote after discovery/);
+  assert.match(prompt, /never a number up front/);
+  assert.match(prompt, /Never drop a price to close/);
+  assert.match(prompt, /50% upfront/);
+});
+
 test('the Fiverr rule keeps payments on the platform', async () => {
   const { buildVoicePrompt } = await import('../lib/ai/voice.ts');
   const fiverr = buildVoicePrompt({ channel: 'fiverr' });

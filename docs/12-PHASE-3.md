@@ -75,7 +75,7 @@ fully testable.
 - Keyed on the thread id, never on the handle. Fifteen different people share
   `instagramuser` in the real archive, so the handle is not an identity.
 
-### 4. `lib/ai/draft.ts` (new)
+### 4. `lib/ai/draft-core.ts` and `lib/ai/draft.ts` (done)
 
 The hot path, and the only function the UI calls.
 
@@ -139,7 +139,7 @@ fine-tuning, nothing that changes rules behind your back.
 | --- | --- | --- |
 | 3.1 | `routing.ts`, `provider.ts`, `telemetry.ts`, usage panel | **Done.** Two real calls on the live key, model ids and latency recorded |
 | 3.2 | `voice.ts` and `context.ts` | **Done.** 11 tests on the assembled prompt, no model calls |
-| 3.3 | `draft.ts` pipeline with a fake model | Tests prove a chase draft is caught and regenerated, and that a second failure is surfaced rather than hidden |
+| 3.3 | `draft-core.ts`, `draft.ts` | **Done.** 10 tests on the loop, plus two real drafts on live conversations |
 | 3.4 | The client page panel | Real screenshot of the working page on a phone viewport |
 | 3.5 | Replay against the archive | Ten real client messages from engaged threads, drafted, guard scored, compared with what you actually sent |
 | 3.6 | Screenshot reading | A real screenshot from your phone, extracted, then drafted |
@@ -148,6 +148,27 @@ fine-tuning, nothing that changes rules behind your back.
 Step 3.5 is the honest one. It is the closest thing to a fair test that exists
 before real use: ten real messages, and you judge whether the draft beats,
 ties or loses to what you sent by hand.
+
+## What the real drafts found, 2026-10-08
+
+`scripts/verify-draft.mjs` ran the pipeline on real conversations from the
+archive, up to a real client message. Three findings, in order of importance.
+
+**The model invented a service.** Asked to help a client grow their pages, it
+offered to "create video content for TikTok and Instagram". That is not on the
+catalogue. This is the fabrication risk arriving in practice, not in theory, and
+it is invisible to any guard that only checks phrasing. The fix is in the voice
+contract: the catalogue and its prices are now listed as the complete set of
+what he sells, with an explicit instruction that inventing a service is the
+worst failure available here, because he has to deliver it afterwards.
+
+**Two drafts came back clean on the first attempt.** Both stayed inside the
+length budget, asked exactly one question, avoided lists and dashes. One handled
+a Fiverr next step correctly by keeping it on the platform.
+
+**Latency is 6 to 18 seconds** for a real draft with thinking enabled. Fine for
+a reply he reviews before sending, and it is why the UI needs to show that it is
+working rather than appear frozen.
 
 ## Verified on the live key, 2026-10-08
 
