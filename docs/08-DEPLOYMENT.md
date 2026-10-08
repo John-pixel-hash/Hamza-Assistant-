@@ -7,6 +7,23 @@ hosting both have free tiers that a single user fits inside comfortably.
 Read this whole page before starting. Steps 3 and 4 are the two that are easy to
 get wrong, and both of them are about not locking yourself out.
 
+## Status, 2026-10-08
+
+Everything in this guide is done for this project. The repository is connected
+to Vercel on branch `main`, so every push deploys by itself in about a minute,
+and no drag and drop upload is ever needed again. The 39 engaged Instagram
+conversations are already imported, by the API route rather than the SQL editor
+route, recorded in doc 07.
+
+To confirm a deploy went live without opening any dashboard:
+
+```bash
+curl -s https://hamza-assistant.vercel.app/api/health
+```
+
+The `build` field is the commit the live site is running. When it matches the
+commit that was pushed, the deploy is complete.
+
 ## The shape of it
 
 | Piece | What it is | Where it lives | Cost |
@@ -207,9 +224,16 @@ Two details that catch people out after adding them:
 
 ## Step 6: Import your conversations
 
-Once you are signed in on the deployed app, open the Supabase SQL editor, paste
-`scripts/import-instagram-engaged.sql` and run it once. Expect 39 conversations
-and 762 messages, and expect the second run to write nothing.
+Already done for the 39 engaged conversations. For any future import, either
+route works:
+
+```bash
+python3 scripts/import-via-api.py --file scripts/import-instagram-engaged.sql
+```
+
+or open the Supabase SQL editor, paste `scripts/import-instagram-engaged.sql`
+and run it once. Expect 39 conversations and 762 messages, and expect the second
+run to write nothing.
 
 That file is git ignored because it contains your private conversations in plain
 text. Keep it local, or regenerate it when needed:
