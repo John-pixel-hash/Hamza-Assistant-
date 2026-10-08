@@ -155,8 +155,25 @@ python3 scripts/build-instagram-import.py --selection all       # 393 conversati
 python3 scripts/build-instagram-import.py --selection handles --handles invictus,joelgill_13,bnova
 ```
 
-That writes `scripts/import-instagram-<selection>.sql`. Open the SQL editor in
-your assistant Supabase project, paste the file, run it once.
+That writes `scripts/import-instagram-<selection>.sql`.
+
+### The easy way, no SQL editor
+
+```bash
+python3 scripts/import-via-api.py --file scripts/import-instagram-engaged.sql --dry-run
+python3 scripts/import-via-api.py --file scripts/import-instagram-engaged.sql
+```
+
+This does the identical work through the REST API with the server secret key
+from `.env.local`. It exists because the SQL file is 173 KB and pasting that into
+the SQL editor from a phone is miserable. It follows the SQL step for step,
+including the idempotency rule, so the two methods can be used interchangeably
+and neither one duplicates the other's work.
+
+### The SQL editor way
+
+Open the SQL editor in your assistant Supabase project, paste the file, run it
+once.
 
 It is safe to run twice. Existing conversations are left untouched, and the
 script reports how many it created and how many it skipped. It also refuses to
@@ -188,9 +205,38 @@ The last statement prints a confirmation:
 - The generated SQL contains zero dashes in the text written by the importer.
   The 11 that remain in the file are dashes you actually sent in real messages.
 
-## 9. Not imported yet
+## 9. The import into the live project, 2026-10-08
 
-The archive was parsed and analysed, but nothing has been written to your
-database. That needs two things first: your assistant Supabase keys, and a
-decision from you on which conversations to bring in. The 39 engaged
-conversations are the recommended starting point.
+Done, through the API route, against project `qtsndukhlchymsldvuet`.
+
+| Check | Result |
+| --- | --- |
+| Clients created | 39 |
+| Threads created | 39 |
+| Messages written | 762 |
+| Messages on any other channel | 0, so nothing was overwritten |
+| Second run | 0 created, 39 skipped, 0 written |
+
+Read back from the live database afterwards, so this is the app's real state and
+not the importer's own report:
+
+- The follow up list shows 12 people worth a nudge, led by Fahad Khan at 46 days.
+  They are marked `nudge`, not `follow_up_overdue`, because the client replied
+  last and the ball is in their court rather than yours.
+- Full text search over the imported history returns real hits across languages,
+  including Urdu in Roman script and Italian, exactly as those conversations
+  happened.
+- Threads are titled `Instagram: <handle>`, one per client, ready for the reply
+  panel.
+
+One thing to know about the imported text: your own messages are stored exactly
+as you sent them, dashes and typos included. The no dash rule applies to what the
+assistant writes, not to a record of what you already said. History is not
+rewritten.
+
+## 10. Still available
+
+The archive has 393 conversations. Only the 39 with a real reply are in. The
+other 354 never replied to anything, so importing them would fill the app with
+people who are not leads. They stay in `ig_parsed` and can be brought in later
+with `--selection all` or by naming handles, if you ever want them.
