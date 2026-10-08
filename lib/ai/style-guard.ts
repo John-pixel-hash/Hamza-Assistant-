@@ -63,29 +63,54 @@ export const BANNED_OPENERS = [
 ];
 
 /**
- * Chase messages. These are blocked outright, and the reason is measured rather
- * than assumed.
+ * Chase messages. These are reported outright rather than softened, and the
+ * reason is measured rather than assumed.
  *
- * In the user's own Instagram archive, 356 threads contain a "did you see my
- * message" chase. Those threads got a reply 5% of the time, against 10% across
- * all threads. The chase performs at half the normal rate. Separately, 316
- * messages sent as a third attempt or later earned 2 replies in total, roughly
- * 158 messages per reply.
+ * The evidence, in the order it should be trusted:
+ *
+ * 1. Messages sent before a reply: 1 message and they replied 57% of the time,
+ *    2 messages 26%, 3 or more 1%. The 316 third-attempt messages in the
+ *    archive earned 2 replies between them, about 158 messages per reply.
+ * 2. 0 of the 393 threads in the archive OPEN with a chase. It is never a first
+ *    message, it only ever follows silence.
+ *
+ * A third number gets quoted less often because it is confounded: threads
+ * containing a chase replied 5% against 10% overall. That comparison is not
+ * causal, because a chase only exists in threads that already went quiet. The
+ * count-of-attempts curve above is the honest one.
  *
  * So this is not only a style preference. The message that feels like the
  * diligent thing to send is the one that works worst.
+ *
+ * The phrasings below are taken from what he actually sent, including the
+ * typo'd ones, because a guard that only catches clean English catches nothing.
  */
 export const CHASE_PHRASES = [
-  'did you get a chance to look',
+  'did you get a chance',
+  'did you have a chance',
   'did you see my last message',
   'did you see my message',
+  'did you see my',
+  'did you read my',
+  'did you receive my',
+  'did you get my',
+  'my last message',
   'just checking in',
-  'checking in to see',
+  'checking in',
   'bumping this',
   'any update',
-  'following up on my last message',
-  'did you have a chance to read',
+  'any news',
+  'any thoughts',
+  'following up',
+  'just following up',
+  'wanted to follow up',
+  'still waiting',
   'you have been quite busy',
+  'are you there',
+  // The typo he actually sent, kept because real chasing is not well spelled.
+  'are you their',
+  'sorry for disturb',
+  'sorry to disturb',
 ];
 
 export type LengthBudget = { label: string; maxWords: number };

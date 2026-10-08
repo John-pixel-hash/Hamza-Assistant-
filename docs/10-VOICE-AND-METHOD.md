@@ -262,7 +262,7 @@ Concrete changes this reading produces:
 7. **Follow up discipline in the pipeline.** After one unanswered follow up the
    app stops suggesting more, and says so plainly.
 
-## 8. What I need from you
+## 8. What I needed from you, now answered
 
 1. **Agree or overrule the five conflicts** in section 4. My recommendations are
    defaults, not decisions I should make for you.

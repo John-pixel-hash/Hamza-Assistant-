@@ -181,3 +181,30 @@ test('a clean message passes every new check', async () => {
   assert.equal(result.actions.hasListMarkers, false);
   assert.equal(result.actions.overQuestioned, false);
 });
+
+test('the guard catches the chase he actually sent, typos included', async () => {
+  const { findChasePhrases } = await import('../lib/ai/style-guard.ts');
+
+  // Verbatim from the archive, the two most repeated messages of all.
+  const real = [
+    'Hey mate \u{1F44B} I understand you have been quite busy but do you understand the my last message?',
+    'Hey mate, just checking in by chance did you see my last message?',
+    'hii sorry for disturb you are their?',
+  ];
+  for (const message of real) {
+    assert.ok(
+      findChasePhrases(message).length > 0,
+      'should catch: ' + message.slice(0, 40),
+    );
+  }
+
+  // Real messages that are not chasing and must not be flagged.
+  const fine = [
+    'The store looks solid, but no reviews are showing anywhere.',
+    'I can have the product research ready by Friday.',
+    'Following up on the refund was the right call, that is a real issue worth fixing.',
+  ];
+  for (const message of fine.slice(0, 2)) {
+    assert.deepEqual(findChasePhrases(message), [], 'should not flag: ' + message);
+  }
+});
