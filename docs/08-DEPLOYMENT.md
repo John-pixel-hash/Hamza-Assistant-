@@ -172,6 +172,30 @@ The reliable way to avoid this whole class of problem is Step 1: connect the
 GitHub repository. Vercel reads the framework from the project itself, and every
 push to `main` deploys automatically.
 
+## Your .env.local file does not go to Vercel
+
+This trips up almost everyone, so it is worth stating plainly.
+
+`.env.local` is for running the app on your own machine. **Vercel never reads
+it.** It is not uploaded, it is not checked into git (it is in `.gitignore`
+precisely so it never can be), and the deployed server has no idea it exists.
+
+A deployed app gets its settings from **Vercel's own environment variables**:
+project, **Settings**, **Environment Variables**. Same names, same values, typed
+into the dashboard instead of a file.
+
+The tell is the message the app shows you. If it says the database is not
+connected, the variables are missing from Vercel, not missing from your laptop.
+Since version d7c8edd the app says exactly which ones and where to put them.
+
+Two details that catch people out after adding them:
+
+- **You must redeploy.** Variables starting with `NEXT_PUBLIC_` are baked into
+  the build, so an existing deployment keeps serving the old values until it is
+  rebuilt. Vercel usually offers a redeploy button right there after you save.
+- **Set them for Production, Preview and Development.** Otherwise a preview
+  deployment behaves differently from the live one, which is confusing later.
+
 ## Step 5: Turn the lock on, then test it
 
 1. Claim your account as described in Step 3.
