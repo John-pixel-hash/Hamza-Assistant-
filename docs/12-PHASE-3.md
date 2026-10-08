@@ -137,7 +137,7 @@ fine-tuning, nothing that changes rules behind your back.
 
 | Step | What | How it is proven |
 | --- | --- | --- |
-| 3.1 | `provider.ts`, routing, `ai_runs` logging | One real call, one row in the table, model id and latency recorded |
+| 3.1 | `routing.ts`, `provider.ts`, `telemetry.ts`, usage panel | **Done.** Two real calls on the live key, model ids and latency recorded |
 | 3.2 | `voice.ts` and `context.ts` | Unit tests on the assembled prompt for four fixed situations, no model needed |
 | 3.3 | `draft.ts` pipeline with a fake model | Tests prove a chase draft is caught and regenerated, and that a second failure is surfaced rather than hidden |
 | 3.4 | The client page panel | Real screenshot of the working page on a phone viewport |
@@ -149,8 +149,27 @@ Step 3.5 is the honest one. It is the closest thing to a fair test that exists
 before real use: ten real messages, and you judge whether the draft beats,
 ties or loses to what you sent by hand.
 
+## Verified on the live key, 2026-10-08
+
+`node --env-file=.env.local --import tsx scripts/verify-ai-call.mjs` made two real
+calls through the same code path the app uses:
+
+| Task | Model | Result | Latency |
+| --- | --- | --- | --- |
+| reply_draft | gemini-3.5-flash | ok | 29,217 ms |
+| tone_score | gemini-3.1-flash-lite | "Casual" | 3,533 ms |
+
+One finding worth carrying forward: the drafting call reported 396 output tokens
+and produced 11 words of visible text, because thinking tokens count against
+`maxOutputTokens`. The drafting model needs a generous output budget, around
+2,000 tokens, or the reply comes back cut in half while the telemetry looks
+perfectly healthy. The reply itself also came back as a list opening, which is
+exactly what the guard is there to catch.
+
 ## What I am watching for
 
+- **Thinking tokens against the output budget.** See above. A draft that looks
+  empty or truncated in Phase 3 is this, not a broken model.
 - **Free tier quota.** Per model daily limits are not published with confidence,
   so Settings will show today's call count and which model served it. We find
   the ceiling from use, not from guessing.

@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { getSystemStatus } from '@/lib/data/status';
 import { serverConfigStatus } from '@/lib/env';
 import { signOut } from '@/app/actions/auth';
+import { todayUsage } from '@/lib/ai/telemetry';
+import { DEFAULT_ROUTING } from '@/lib/ai/routing';
 
 export const metadata: Metadata = { title: 'Settings' };
 export const dynamic = 'force-dynamic';
@@ -16,7 +18,11 @@ const STATUS_LABELS: { key: string; label: string; help: string }[] = [
 ];
 
 export default async function SettingsPage() {
-  const [status, config] = await Promise.all([getSystemStatus(), Promise.resolve(serverConfigStatus())]);
+  const [status, config, usage] = await Promise.all([
+    getSystemStatus(),
+    Promise.resolve(serverConfigStatus()),
+    todayUsage(),
+  ]);
 
   return (
     <>
@@ -58,6 +64,34 @@ export default async function SettingsPage() {
       </section>
 
       <section className="mb-6">
+        <h2 className="mb-3 text-[15px] font-semibold">Today's AI use</h2>
+        <div className="card p-4">
+          <div className="flex items-baseline justify-between">
+            <p className="text-[13px] text-ink-soft">
+              Calls today, free tier. The daily limit is per model and is not published
+              with confidence, so this count is how we find the real ceiling from use.
+            </p>
+          </div>
+          <p className="figure mt-2 text-2xl font-semibold text-gold">{usage.calls}</p>
+          {usage.byModel.length > 0 && (
+            <ul className="mt-2 space-y-1">
+              {usage.byModel.map((row) => (
+                <li key={row.modelId} className="flex justify-between text-[12px]">
+                  <span className="text-ink-faint">{row.modelId}</span>
+                  <span className="text-ink-soft">{row.calls}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-3 border-t border-line pt-3 text-[12px] text-ink-faint">
+            {usage.guardrailHits === 0
+              ? 'No draft has needed a guardrail fix today.'
+              : `${usage.guardrailHits} draft${usage.guardrailHits === 1 ? '' : 's'} needed a guardrail fix today.`}
+          </p>
+        </div>
+      </section>
+
+      <section className="mb-6">
         <h2 className="mb-3 text-[15px] font-semibold">Model registry</h2>
         {status.models.length === 0 ? (
           <div className="alert alert-warn">
@@ -85,6 +119,18 @@ export default async function SettingsPage() {
             ))}
           </ul>
         )}
+        <p className="mt-3 text-[13px] text-ink-faint">
+          Which model serves which job, on your free tier. Light jobs go to the lite
+          model so the drafting model keeps its daily allowance.
+        </p>
+        <ul className="card mt-3 divide-y divide-line">
+          {Object.entries(DEFAULT_ROUTING).map(([task, route]) => (
+            <li key={task} className="flex items-center justify-between gap-3 px-4 py-3">
+              <span className="text-[13px] text-ink-soft">{task}</span>
+              <span className="shrink-0 text-[12px] text-ink-faint">{route.modelId}</span>
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section className="mb-6">
