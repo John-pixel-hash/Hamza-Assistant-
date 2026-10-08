@@ -215,3 +215,20 @@ test('the setup advice matches where the app is running', async () => {
     'GOOGLE_GENERATIVE_AI_API_KEY',
   ]);
 });
+
+test('hosted detection does not depend on a single variable', async () => {
+  const { isHostedOnVercel } = await import('../lib/env.ts');
+
+  assert.equal(isHostedOnVercel({ VERCEL: '1' }), true);
+  assert.equal(isHostedOnVercel({ VERCEL: 'true' }), true);
+  // Corroborating signals, in case the primary one is not exposed.
+  assert.equal(isHostedOnVercel({ VERCEL_ENV: 'production' }), true);
+  assert.equal(isHostedOnVercel({ VERCEL_URL: 'hamza-assistant.vercel.app' }), true);
+
+  // A laptop sets none of these, so it keeps the local wording.
+  assert.equal(isHostedOnVercel({}), false);
+  assert.equal(isHostedOnVercel({ VERCEL: '0' }), false);
+  assert.equal(isHostedOnVercel({ VERCEL: '' }), false);
+  assert.equal(isHostedOnVercel({ VERCEL: 'no' }), false);
+  assert.equal(isHostedOnVercel({ VERCEL_ENV: '' }), false);
+});

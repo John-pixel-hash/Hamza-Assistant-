@@ -106,7 +106,29 @@ export function serverConfigStatus() {
  * Vercel sets VERCEL=1 in every environment it builds and runs, so this is a
  * reliable signal rather than a guess.
  */
-export const ON_VERCEL = process.env.VERCEL === '1';
+
+/**
+ * True when this build is running on Vercel.
+ *
+ * Three separate system variables are checked because they are not all exposed
+ * the same way. VERCEL is the primary signal. VERCEL_ENV and VERCEL_URL are
+ * accepted as corroboration so the advice cannot silently fall back to the
+ * local wording when the app is in fact deployed.
+ */
+export function isHostedOnVercel(env: {
+  VERCEL?: string;
+  VERCEL_ENV?: string;
+  VERCEL_URL?: string;
+}): boolean {
+  if (env.VERCEL === '1' || env.VERCEL === 'true') return true;
+  return Boolean(env.VERCEL_ENV || env.VERCEL_URL);
+}
+
+export const ON_VERCEL = isHostedOnVercel({
+  VERCEL: process.env.VERCEL,
+  VERCEL_ENV: process.env.VERCEL_ENV,
+  VERCEL_URL: process.env.VERCEL_URL,
+});
 
 /**
  * The variables a fresh deployment is missing, in the order they are worth
