@@ -1,0 +1,33 @@
+{
+  "name": "hamza-assistant",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "verify:auth": "node tests/auth-e2e.mjs",
+    "verify": "npm run typecheck && npm test && npm run verify:auth"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.58.0",
+    "next": "^16.4.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.0",
+    "tsx": "^4.20.0"
+  }
+}

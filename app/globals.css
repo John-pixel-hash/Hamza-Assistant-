@@ -1,0 +1,245 @@
+@import 'tailwindcss';
+
+/*
+  Brand system: blue, white, black, with gold used sparingly.
+
+  Rules of use, so the gold stays a detail rather than decoration:
+   - Blue carries the brand: primary buttons, links, active navigation, badges.
+   - Black and near black carry the text. White carries the surfaces.
+   - Gold is only for small emphasis: eyebrow labels, the active marker, and
+     deal value figures. Never for buttons, never for large fills.
+   - Amber and red stay distinct from gold so a warning can never be mistaken
+     for a brand flourish.
+*/
+@theme {
+  --color-canvas: #f4f6fb;
+  --color-surface: #ffffff;
+
+  --color-ink: #0b0d12;
+  --color-ink-soft: #4a5262;
+  --color-ink-faint: #7c8595;
+  --color-line: #e3e7ef;
+  --color-line-strong: #cfd6e4;
+
+  --color-brand: #1d4ed8;
+  --color-brand-deep: #0a1b4d;
+  --color-brand-soft: #eaf0fe;
+  --color-brand-ink: #16307f;
+
+  --color-gold: #c08a2e;
+  --color-gold-soft: #fbf4e4;
+  --color-gold-line: #e8d9b0;
+
+  --color-warn: #a3651a;
+  --color-warn-soft: #fdf4e6;
+  --color-warn-line: #f0dcb8;
+
+  --color-danger: #a3282b;
+  --color-danger-soft: #fdf2f2;
+  --color-danger-line: #f3c6c6;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --radius-card: 14px;
+  --shadow-card: 0 1px 2px rgba(11, 13, 18, 0.04), 0 0 0 1px rgba(11, 13, 18, 0.02);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+input,
+textarea,
+select,
+button {
+  font: inherit;
+  color: inherit;
+}
+
+/* --- surfaces ---------------------------------------------------------- */
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+/* A card that carries the brand, for the top of a page or a highlighted block */
+.card-brand {
+  background: var(--color-brand-deep);
+  color: #fff;
+  border: 1px solid var(--color-brand-deep);
+  border-radius: var(--radius-card);
+}
+
+/* --- type ------------------------------------------------------------- */
+.eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-gold);
+}
+
+.h1 {
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--color-ink);
+}
+
+.h2 {
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--color-ink);
+}
+
+.muted {
+  color: var(--color-ink-soft);
+}
+
+.faint {
+  color: var(--color-ink-faint);
+}
+
+.figure {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+/* --- forms ------------------------------------------------------------- */
+.label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ink-soft);
+  margin-bottom: 6px;
+}
+
+.field {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 10px;
+  background: var(--color-surface);
+  outline: none;
+}
+
+.field::placeholder {
+  color: var(--color-ink-faint);
+}
+
+.field:focus {
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px var(--color-brand-soft);
+}
+
+textarea.field {
+  min-height: 96px;
+  resize: vertical;
+}
+
+/* --- buttons ----------------------------------------------------------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s ease, background 0.15s ease;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--color-brand);
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.btn-quiet {
+  background: var(--color-surface);
+  border-color: var(--color-line-strong);
+  color: var(--color-ink);
+}
+
+.btn-quiet:hover:not(:disabled) {
+  background: var(--color-canvas);
+}
+
+.btn-small {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+/* --- messages and states ---------------------------------------------- */
+.alert {
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 1px solid;
+}
+
+.alert-error {
+  background: var(--color-danger-soft);
+  border-color: var(--color-danger-line);
+  color: var(--color-danger);
+}
+
+.alert-warn {
+  background: var(--color-warn-soft);
+  border-color: var(--color-warn-line);
+  color: var(--color-warn);
+}
+
+.alert-brand {
+  background: var(--color-brand-soft);
+  border-color: #cfdcfb;
+  color: var(--color-brand-ink);
+}
+
+/* Message bubbles in a client thread */
+.bubble-client {
+  background: var(--color-brand-soft);
+  border: 1px solid #d8e3fc;
+  color: var(--color-ink);
+}
+
+.bubble-me {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+}
+
+.bubble-note {
+  background: var(--color-gold-soft);
+  border: 1px dashed var(--color-gold-line);
+}
+
+mark {
+  background: var(--color-gold-soft);
+  color: var(--color-ink);
+  border-bottom: 1px solid var(--color-gold);
+  padding: 0 1px;
+}
