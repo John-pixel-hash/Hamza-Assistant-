@@ -184,3 +184,34 @@ test('a blank variable is treated as absent, not as a value', async () => {
   assert.equal(firstFilled('', '', undefined), undefined);
   assert.equal(firstFilled(), undefined);
 });
+
+// ------------------------------------------------- deployment advice -----
+
+test('the setup advice matches where the app is running', async () => {
+  const { missingKeysAdvice, REQUIRED_KEYS } = await import('../lib/env.ts');
+
+  // The bug this prevents: telling somebody to edit .env.local on a deployed
+  // app, where Vercel never reads that file. That message wasted real time.
+  const hosted = missingKeysAdvice({ onVercel: true });
+  assert.match(hosted, /Vercel/);
+  assert.match(hosted, /Environment Variables/i);
+  assert.match(hosted, /redeploy/i);
+  // It may mention .env.local, but only to say it will not work there. What it
+  // must never do is instruct somebody to put keys in it.
+  assert.ok(
+    !/add them to \.env\.local|edit \.env\.local/i.test(hosted),
+    'a deployed app must not be told to put keys in .env.local',
+  );
+
+  const local = missingKeysAdvice({ onVercel: false });
+  assert.match(local, /\.env\.local/);
+  assert.match(local, /restart/i);
+
+  // The names are shown to the user, so they must be the real ones and complete.
+  assert.deepEqual([...REQUIRED_KEYS], [
+    'NEXT_PUBLIC_SUPABASE_URL',
+    'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+    'SUPABASE_SECRET_KEY',
+    'GOOGLE_GENERATIVE_AI_API_KEY',
+  ]);
+});

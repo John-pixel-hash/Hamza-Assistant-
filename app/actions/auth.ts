@@ -14,7 +14,7 @@ export type AuthState = { error: string | null };
  */
 export async function signIn(_prev: AuthState, formData: FormData): Promise<AuthState> {
   if (!SUPABASE_CONFIGURED) {
-    return { error: 'Supabase is not connected yet. Add your keys to .env.local first.' };
+    return { error: 'The database is not connected yet, so sign in is unavailable.' };
   }
 
   const email = String(formData.get('email') ?? '').trim().toLowerCase();
@@ -56,7 +56,7 @@ export async function claimAccount(
   formData: FormData,
 ): Promise<AuthState> {
   if (!SUPABASE_CONFIGURED) {
-    return { error: 'Supabase is not connected yet. Add your keys to .env.local first.' };
+    return { error: 'The database is not connected yet, so sign in is unavailable.' };
   }
 
   if (!ALLOW_SIGNUP) {

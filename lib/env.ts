@@ -99,3 +99,37 @@ export function serverConfigStatus() {
     tavilyKey: has('TAVILY_API_KEY'),
   };
 }
+
+/**
+ * True when this build is running on Vercel rather than on a laptop.
+ *
+ * Vercel sets VERCEL=1 in every environment it builds and runs, so this is a
+ * reliable signal rather than a guess.
+ */
+export const ON_VERCEL = process.env.VERCEL === '1';
+
+/**
+ * The variables a fresh deployment is missing, in the order they are worth
+ * adding. Only the names, never a value.
+ */
+export const REQUIRED_KEYS = [
+  'NEXT_PUBLIC_SUPABASE_URL',
+  'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+  'SUPABASE_SECRET_KEY',
+  'GOOGLE_GENERATIVE_AI_API_KEY',
+] as const;
+
+/**
+ * Where to put the keys, which depends entirely on where the app is running.
+ *
+ * This sentence used to say ".env.local, then restart the server" everywhere,
+ * which is correct locally and actively misleading on a deployed app. Vercel
+ * never reads .env.local. It was in the code only because local development was
+ * the only place it had ever been seen. A message that sends somebody to edit a
+ * file the server cannot see costs them an hour.
+ */
+export function missingKeysAdvice(input: { onVercel: boolean }): string {
+  return input.onVercel
+    ? 'Add them in Vercel under Settings, Environment Variables, then redeploy. Vercel does not read a .env.local file.'
+    : 'Add them to .env.local, then restart the server.';
+}

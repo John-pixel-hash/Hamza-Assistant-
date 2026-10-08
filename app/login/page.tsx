@@ -1,7 +1,15 @@
 import Link from 'next/link';
 import { LoginForm } from './login-form';
 import { BrandMark } from '@/components/brand-mark';
-import { ALLOWED_EMAIL, ALLOW_SIGNUP, APP_NAME, SUPABASE_CONFIGURED } from '@/lib/env';
+import {
+  ALLOWED_EMAIL,
+  ALLOW_SIGNUP,
+  APP_NAME,
+  ON_VERCEL,
+  REQUIRED_KEYS,
+  SUPABASE_CONFIGURED,
+  missingKeysAdvice,
+} from '@/lib/env';
 
 export const metadata = { title: `Sign in | ${APP_NAME}` };
 
@@ -31,8 +39,16 @@ export default async function LoginPage({
 
       {!SUPABASE_CONFIGURED && (
         <div className="alert alert-warn mb-5">
-          Supabase is not connected yet. Add your project keys to <code>.env.local</code>,
-          then restart the server.
+          <p className="font-medium">The database is not connected yet.</p>
+          <p className="mt-1">{missingKeysAdvice({ onVercel: ON_VERCEL })}</p>
+          <p className="mt-2 text-sm">
+            These variables are missing or blank:{' '}
+            {REQUIRED_KEYS.map((key) => (
+              <code key={key} className="mr-1 break-all">
+                {key}
+              </code>
+            ))}
+          </p>
         </div>
       )}
 

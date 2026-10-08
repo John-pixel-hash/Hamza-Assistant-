@@ -1,7 +1,14 @@
 import { redirect } from 'next/navigation';
 import { SetupForm } from './setup-form';
 import { BrandMark } from '@/components/brand-mark';
-import { ALLOWED_EMAIL, ALLOW_SIGNUP, APP_NAME, SUPABASE_CONFIGURED } from '@/lib/env';
+import {
+  ALLOWED_EMAIL,
+  ALLOW_SIGNUP,
+  APP_NAME,
+  ON_VERCEL,
+  SUPABASE_CONFIGURED,
+  missingKeysAdvice,
+} from '@/lib/env';
 
 export const metadata = { title: `Setup | ${APP_NAME}` };
 
@@ -31,7 +38,7 @@ export default function SetupPage() {
 
       {!SUPABASE_CONFIGURED && (
         <div className="alert alert-warn mb-5">
-          Add your Supabase keys to <code>.env.local</code> before creating the account.
+          The database is not connected yet, so no account can be created. {missingKeysAdvice({ onVercel: ON_VERCEL })}
         </div>
       )}
 
