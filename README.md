@@ -99,8 +99,8 @@ tests/                        unit tests, end to end access test, mock Supabase
 ```bash
 npm run dev              # local development
 npm run typecheck        # strict TypeScript
-npm test                 # 51 unit tests: access rules, validation, guardrails, copy rules
-npm run verify:auth      # 45 end to end access checks
+npm test                 # 61 unit tests: access rules, guardrails, cookies, copy rules
+npm run verify:auth      # 47 end to end access checks
 npm run verify           # all of the above, in order
 bash scripts/verify-schema.sh   # schema against real Postgres (needs Postgres 17 + pgvector)
 
@@ -122,6 +122,12 @@ Stages, in the order the app sorts them: `active`, `negotiating`, `quoted`,
 `contacted`, `lead`, `delivered`, `repeat`, `outreach`, `lost`.
 
 Requires Node 22 or newer.
+
+## Deploying it
+
+`docs/08-DEPLOYMENT.md` is the full walkthrough: GitHub, Supabase, Vercel, the
+environment variables, and the two steps that lock people out if you get the
+order wrong.
 
 ## First run
 
