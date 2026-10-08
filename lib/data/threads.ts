@@ -71,7 +71,14 @@ export type ThreadDetail = {
     status: string;
     client_id: string | null;
   };
-  client: { id: string; name: string; company: string | null; stage: string } | null;
+  client: {
+    id: string;
+    name: string;
+    company: string | null;
+    stage: string;
+    source: string | null;
+    channel: string | null;
+  } | null;
   messages: MessageRow[];
   attachments: AttachmentRow[];
 };
@@ -84,7 +91,7 @@ export async function getThread(id: string): Promise<ThreadDetail | null> {
 
   const { data: thread, error } = await supabase
     .from('threads')
-    .select('id, title, mode, status, client_id, clients(id, name, company, stage)')
+    .select('id, title, mode, status, client_id, clients(id, name, company, stage, source, channel)')
     .eq('id', id)
     .maybeSingle();
 

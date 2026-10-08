@@ -97,9 +97,13 @@ draft is a repair, not a lottery.
 
 - `draftReply()` server action, guarded by the same owner check as everything else.
 - `markSent()`, which stores what he actually sent, edited or untouched.
-- A panel on the client page: paste box, platform picker, the draft, a copy
-  button, an edit box, the next-step hint, and one tap to mark it sent.
-  Mobile first, because that is where this gets used.
+- The panel lives on the **thread page**, not the client page, because a thread
+  is one conversation with one client and that is where the history already is.
+  Paste box, platform picker, tone picker, an optional instruction, the draft in
+  an editable box with a word and question count, a copy button, and one tap to
+  record what was sent. Mobile first, because that is where this gets used.
+- It is server rendered and asserted in the auth harness with a seeded thread, so
+  a broken panel fails the suite rather than being discovered on the phone.
 
 The screenshot path adds `app/actions/vision.ts`: Gemini reads the image into
 structured messages, then the normal draft pipeline runs. The image itself is
@@ -140,7 +144,7 @@ fine-tuning, nothing that changes rules behind your back.
 | 3.1 | `routing.ts`, `provider.ts`, `telemetry.ts`, usage panel | **Done.** Two real calls on the live key, model ids and latency recorded |
 | 3.2 | `voice.ts` and `context.ts` | **Done.** 11 tests on the assembled prompt, no model calls |
 | 3.3 | `draft-core.ts`, `draft.ts` | **Done.** 10 tests on the loop, plus two real drafts on live conversations |
-| 3.4 | The client page panel | Real screenshot of the working page on a phone viewport |
+| 3.4 | The reply panel | **Done.** Five checks in the auth harness prove it renders for the owner on a real thread |
 | 3.5 | Replay against the archive | Ten real client messages from engaged threads, drafted, guard scored, compared with what you actually sent |
 | 3.6 | Screenshot reading | A real screenshot from your phone, extracted, then drafted |
 | 3.7 | The learning loop | Your sent version stored beside the draft, and the diff visible |

@@ -17,6 +17,64 @@ const PORT = Number(process.env.MOCK_PORT ?? 54321);
 const OWNER_EMAIL = (process.env.MOCK_OWNER_EMAIL ?? 'hamza@example.com').toLowerCase();
 const OWNER_PASSWORD = process.env.MOCK_OWNER_PASSWORD ?? 'correct-horse-battery-staple';
 
+/**
+ * One seeded thread, so the reply panel can be rendered and asserted in a real
+ * signed-in session. Fixed ids, because the harness has to reference them.
+ */
+export const FIXTURE = {
+  clientId: '11111111-1111-4111-8111-111111111111',
+  threadId: '22222222-2222-4222-8222-222222222222',
+  client: {
+    id: '11111111-1111-4111-8111-111111111111',
+    name: 'Simon Fixture',
+    company: 'Fixture Trading',
+    stage: 'quoted',
+    source: 'fiverr',
+    channel: 'fiverr',
+    country: 'United Kingdom',
+    tags: [],
+    deal_value_estimate: 199.99,
+    currency: 'USD',
+    last_contact_at: '2026-10-01T10:00:00Z',
+    last_message_at: '2026-10-02T10:00:00Z',
+    last_message: 'Can you do 150?',
+    last_message_role: 'client',
+    client_message_count: 2,
+    my_message_count: 1,
+    thread_count: 1,
+    open_projects: 0,
+    summary: 'Fiverr buyer, quoted 199.99, pushing on price.',
+    notes: null,
+  },
+  thread: {
+    id: '22222222-2222-4222-8222-222222222222',
+    title: 'Simon, Fiverr order',
+    mode: 'client_reply',
+    status: 'open',
+    client_id: '11111111-1111-4111-8111-111111111111',
+  },
+  messages: [
+    {
+      id: '33333333-3333-4333-8333-333333333333',
+      thread_id: '22222222-2222-4222-8222-222222222222',
+      role: 'me',
+      content: 'The store build is 199.99 and that covers everything.',
+      channel: 'fiverr',
+      sent_at: '2026-10-01T10:00:00Z',
+      created_at: '2026-10-01T10:00:00Z',
+    },
+    {
+      id: '44444444-4444-4444-8444-444444444444',
+      thread_id: '22222222-2222-4222-8222-222222222222',
+      role: 'client',
+      content: 'Can you do 150?',
+      channel: 'fiverr',
+      sent_at: '2026-10-02T10:00:00Z',
+      created_at: '2026-10-02T10:00:00Z',
+    },
+  ],
+};
+
 /** access token -> user */
 const sessions = new Map();
 /** email -> password, for accounts created at runtime */
@@ -149,6 +207,33 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.method === 'GET') {
+      // The seeded thread and its messages, so the reply panel can be rendered
+      // for real. Everything else answers empty, which renders the empty states.
+      const table = path.replace('/rest/v1/', '');
+      const idFilter = url.searchParams.get('id');
+
+      if (table === 'threads' && idFilter === `eq.${FIXTURE.threadId}`) {
+        return json(res, 200, {
+          ...FIXTURE.thread,
+          clients: {
+            id: FIXTURE.client.id,
+            name: FIXTURE.client.name,
+            company: FIXTURE.client.company,
+            stage: FIXTURE.client.stage,
+            source: FIXTURE.client.source,
+            channel: FIXTURE.client.channel,
+          },
+        });
+      }
+
+      if (table === 'messages' && url.searchParams.get('thread_id') === `eq.${FIXTURE.threadId}`) {
+        return json(res, 200, FIXTURE.messages);
+      }
+
+      if (table === 'client_overview' && idFilter === `eq.${FIXTURE.clientId}`) {
+        return json(res, 200, FIXTURE.client);
+      }
+
       if (wantsSingleObject) {
         // What PostgREST returns when a single row was requested and none exist.
         return json(res, 406, {

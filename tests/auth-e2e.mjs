@@ -382,6 +382,46 @@ async function main() {
     `status ${newClient.status}`,
   );
 
+  // Phase 3.4: the reply panel has to render for the owner on a real thread,
+  // with the platform picker and the Fiverr rule that follows the client.
+  const fixtureThread = await fetch(
+    `${APP}/threads/22222222-2222-4222-8222-222222222222`,
+    { headers: cookieHeader, redirect: 'manual' },
+  );
+  const threadHtml = await fixtureThread.text();
+  check(
+    'the reply panel renders on a thread the owner can see',
+    fixtureThread.status === 200 && /write a reply/i.test(threadHtml),
+    `status ${fixtureThread.status}`,
+  );
+  check(
+    'the panel offers the platforms he actually works on',
+    /instagram/i.test(threadHtml) && /fiverr/i.test(threadHtml) && /whatsapp/i.test(threadHtml),
+    'the platform picker should list Instagram, Fiverr and WhatsApp',
+  );
+  check(
+    'the panel defaulted to the client\'s own channel, Fiverr',
+    fixtureThread.status === 200 && /<option[^>]*value="fiverr"[^>]*selected/i.test(threadHtml),
+    'a Fiverr client should open on Fiverr without switching',
+  );
+  // The save control appears once there is a draft to save, so what is asserted
+  // here is the entry point: the paste box and the button that starts a draft.
+  check(
+    'the panel takes a pasted client message and offers to draft from it',
+    /what the client sent/i.test(threadHtml) && /draft the reply/i.test(threadHtml),
+    'the paste box and the draft button are the way in',
+  );
+  check(
+    'the panel warns how long a draft takes, rather than looking frozen',
+    /ten to twenty seconds/i.test(threadHtml),
+    'a real draft takes 6 to 18 seconds, so the panel has to say so',
+  );
+  check(
+    'the seeded client\'s conversation is on the page',
+    /Can you do 150\?/.test(threadHtml),
+    'the thread history must render for the drafting context to be visible',
+  );
+
   const missingThread = await fetch(`${APP}/threads/00000000-0000-0000-0000-000000000000`, {
     headers: cookieHeader,
     redirect: 'manual',

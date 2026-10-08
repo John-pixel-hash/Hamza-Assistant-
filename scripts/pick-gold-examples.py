@@ -343,7 +343,7 @@ def main() -> None:
         "They exist to teach the base voice: the way he opens, explains, prices and",
         "closes, in his own words, on real clients.",
         "",
-        "**Status: shortlist, waiting for approval.** The assistant does not send",
+        "**Status: approved by Hamza on 2026-10-08.** The assistant does not send",
         "these words back at clients. They are the reference set behind every draft.",
         "",
         "Dashes inside quoted messages were normalised to commas and full stops on",
@@ -459,7 +459,7 @@ def main() -> None:
     payload = {
         "source": "ig_parsed, the owner's own Instagram export",
         "generated_by": "scripts/pick-gold-examples.py",
-        "status": "approved by the owner on 2026-10-08 to be selected from the archive",
+        "status": "approved by the owner on 2026-10-08: these 24 are the reference set",
         "how_to_use": (
             "Reference for voice, never text to reuse. The assistant must write new "
             "words in this register, not paste these messages."

@@ -1,7 +1,7 @@
 {
   "source": "ig_parsed, the owner's own Instagram export",
   "generated_by": "scripts/pick-gold-examples.py",
-  "status": "approved by the owner on 2026-10-08 to be selected from the archive",
+  "status": "approved by the owner on 2026-10-08: these 24 are the reference set",
   "how_to_use": "Reference for voice, never text to reuse. The assistant must write new words in this register, not paste these messages.",
   "scanned": {
     "conversations": 393,

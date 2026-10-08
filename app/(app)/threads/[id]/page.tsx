@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { MessageComposer } from '@/components/message-composer';
+import { ReplyPanel } from '@/components/reply-panel';
 import { RoleTag } from '@/components/ui';
 import { getThread } from '@/lib/data/threads';
 import { CHANNEL_LABELS, ROLE_LABELS, STAGE_LABELS } from '@/lib/domain';
@@ -136,6 +137,13 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
           })
         )}
       </section>
+
+      {/* The reply panel sits above the composer: read the conversation, draft,
+          edit, send, then record it. */}
+      <ReplyPanel
+        defaultChannel={client?.channel ?? 'instagram'}
+        threadId={thread.id}
+      />
 
       <section className="mt-5">
         <MessageComposer threadId={thread.id} clientId={thread.client_id} defaultRole="client" />

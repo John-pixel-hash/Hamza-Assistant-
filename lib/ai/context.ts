@@ -33,7 +33,8 @@ export type ContextClient = {
 export type ContextFact = {
   key: string;
   value: string;
-  confidence?: string | null;
+  /** Numeric in the database, descriptive in tests. Both are accepted. */
+  confidence?: number | string | null;
 };
 
 export type ContextProject = {
@@ -82,6 +83,18 @@ function trim(text: string): string {
     : `${clean.slice(0, MAX_MESSAGE_CHARS)} ... [cut]`;
 }
 
+/**
+ * Whether a fact is shaky enough to be labelled as such in the prompt.
+ *
+ * The database stores confidence as a number, tests and older rows may describe
+ * it in words, and anything unlabelled is treated as solid rather than flagged.
+ */
+function isUncertain(confidence: number | string | null | undefined): boolean {
+  if (typeof confidence === 'number') return confidence < 0.6;
+  if (typeof confidence === 'string') return ['low', 'uncertain', 'weak'].includes(confidence);
+  return false;
+}
+
 function money(value: number | null | undefined, currency: string | null | undefined): string | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) return null;
   return `${currency ?? 'USD'} ${value}`;
@@ -128,7 +141,7 @@ export function assembleContext(input: ContextInput): AssembledContext {
     lines.push('');
     lines.push('## Confirmed facts about them');
     for (const fact of facts) {
-      const mark = fact.confidence === 'low' ? ' (uncertain)' : '';
+      const mark = isUncertain(fact.confidence) ? ' (uncertain)' : '';
       lines.push(`- ${fact.key}: ${fact.value}${mark}`);
     }
   }
