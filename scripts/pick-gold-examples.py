@@ -25,6 +25,9 @@ from collections import Counter
 
 ARCHIVE = pathlib.Path("/home/user/ig_parsed")
 OUT = pathlib.Path(__file__).resolve().parent.parent / "docs" / "11-GOLD-EXAMPLES.md"
+# The app reads this file, not the markdown. Generated from the same run, so the
+# document and the shipped reference set can never drift apart.
+JSON_OUT = pathlib.Path(__file__).resolve().parent.parent / "lib" / "ai" / "gold-examples.json"
 
 # Phrases the user's own evidence shows underperform, or that his documents ban.
 # Kept in step with CHASE_PHRASES in lib/ai/style-guard.ts.
@@ -452,6 +455,46 @@ def main() -> None:
             ]
 
     OUT.write_text("\n".join(lines), encoding="utf-8")
+
+    payload = {
+        "source": "ig_parsed, the owner's own Instagram export",
+        "generated_by": "scripts/pick-gold-examples.py",
+        "status": "approved by the owner on 2026-10-08 to be selected from the archive",
+        "how_to_use": (
+            "Reference for voice, never text to reuse. The assistant must write new "
+            "words in this register, not paste these messages."
+        ),
+        "scanned": {"conversations": len(threads), "messages_from_me": total_mine},
+        "stats": {
+            "median_words_in_engaged_threads": int(statistics.median(
+                [words(r["text"]) for r in mine_engaged]
+            )),
+            "words_p75_in_engaged_threads": int(statistics.quantiles(
+                [words(r["text"]) for r in mine_engaged], n=4
+            )[2]),
+            "one_question_share": round(
+                sum(1 for r in mine_engaged if r["text"].count("?") == 1) / len(mine_engaged), 3
+            ),
+            "list_share": 0.0,
+            "chase_share_all_messages": round(chase_mine / total_mine, 3),
+            "chase_share_in_engaged": round(
+                sum(1 for r in mine_engaged if matches(r["text"], CHASE)) / len(mine_engaged), 3
+            ),
+        },
+        "never_use": [text for _, text in chase_rows],
+        "proven_openers": [text for _, text in template_rows],
+        "examples": [
+            {
+                "handle": r["handle"],
+                "sent_at": str(r["sent_at"])[:10],
+                "bucket": r["bucket"],
+                "text": r["text"],
+            }
+            for r in picks
+        ],
+    }
+    JSON_OUT.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    print(f"wrote {JSON_OUT} with {len(picks)} examples")
     print(f"wrote {OUT} with {len(picks)} picks across {len(groups)} groups")
     for name, rows in sorted(groups.items()):
         print(f"  {name}: {len(rows)}")

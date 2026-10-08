@@ -47,7 +47,7 @@ The only place in the codebase that knows which model is being used.
 Your model choice stands: `gemini-3.5-flash` for drafting, `gemini-3.1-flash-lite`
 for classification and extraction, free tier, no billing switch.
 
-### 2. `lib/ai/voice.ts` (new)
+### 2. `lib/ai/voice.ts` (done)
 
 The behaviour contract, as text. Built from `09-ASSISTANT-BEHAVIOUR-SPEC.md` and
 `10-VOICE-AND-METHOD.md` plus the approved shortlist in `11-GOLD-EXAMPLES.md`.
@@ -62,7 +62,7 @@ The examples are reference, not templates. The instruction around them says so
 explicitly, because pasting someone's old words into a new conversation is
 exactly the robotic failure being avoided.
 
-### 3. `lib/ai/context.ts` (new)
+### 3. `lib/ai/context.ts` (done)
 
 Pure functions that assemble what the model is told. No model calls, so it is
 fully testable.
@@ -138,7 +138,7 @@ fine-tuning, nothing that changes rules behind your back.
 | Step | What | How it is proven |
 | --- | --- | --- |
 | 3.1 | `routing.ts`, `provider.ts`, `telemetry.ts`, usage panel | **Done.** Two real calls on the live key, model ids and latency recorded |
-| 3.2 | `voice.ts` and `context.ts` | Unit tests on the assembled prompt for four fixed situations, no model needed |
+| 3.2 | `voice.ts` and `context.ts` | **Done.** 11 tests on the assembled prompt, no model calls |
 | 3.3 | `draft.ts` pipeline with a fake model | Tests prove a chase draft is caught and regenerated, and that a second failure is surfaced rather than hidden |
 | 3.4 | The client page panel | Real screenshot of the working page on a phone viewport |
 | 3.5 | Replay against the archive | Ten real client messages from engaged threads, drafted, guard scored, compared with what you actually sent |
