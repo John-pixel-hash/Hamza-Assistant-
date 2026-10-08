@@ -37,6 +37,57 @@ export const FILLER_PHRASES = [
   'at the end of the day',
 ];
 
+/**
+ * Openers that make a message read as filler rather than a person.
+ *
+ * The list is longer than it looks it should be because it is not a matter of
+ * taste. Two of these are banned by the user's own client guide, and these are
+ * the phrases that give a generated message away fastest.
+ */
+export const BANNED_OPENERS = [
+  'that is great',
+  'that is totally fine',
+  'that is smart',
+  'great question',
+  'absolutely',
+  'of course',
+  'no worries at all',
+  'happy to help',
+  'sure thing',
+  'i understand',
+  'glad you asked',
+  'that makes sense',
+  'thanks for reaching out',
+  'thank you for reaching out',
+  'i hope this email finds you well',
+];
+
+/**
+ * Chase messages. These are blocked outright, and the reason is measured rather
+ * than assumed.
+ *
+ * In the user's own Instagram archive, 356 threads contain a "did you see my
+ * message" chase. Those threads got a reply 5% of the time, against 10% across
+ * all threads. The chase performs at half the normal rate. Separately, 316
+ * messages sent as a third attempt or later earned 2 replies in total, roughly
+ * 158 messages per reply.
+ *
+ * So this is not only a style preference. The message that feels like the
+ * diligent thing to send is the one that works worst.
+ */
+export const CHASE_PHRASES = [
+  'did you get a chance to look',
+  'did you see my last message',
+  'did you see my message',
+  'just checking in',
+  'checking in to see',
+  'bumping this',
+  'any update',
+  'following up on my last message',
+  'did you have a chance to read',
+  'you have been quite busy',
+];
+
 export type LengthBudget = { label: string; maxWords: number };
 
 const DEFAULT_BUDGET: LengthBudget = { label: 'Message', maxWords: 200 };
@@ -58,6 +109,15 @@ export type GuardActions = {
   words: number;
   lengthOk: boolean;
   overBudgetBy: number;
+  /** Chase phrases present. Any entry here means the draft should be rewritten. */
+  chasePhrases: string[];
+  /** Banned openers present after stripping. Should always be empty. */
+  bannedOpeners: string[];
+  /** Questions asked in the draft. The user's rule is exactly one. */
+  questions: number;
+  overQuestioned: boolean;
+  /** True when the draft is formatted as a list. Rejected in a chat message. */
+  hasListMarkers: boolean;
 };
 
 export type GuardResult = { text: string; actions: GuardActions };
@@ -142,6 +202,46 @@ export function countWords(text: string): number {
   return trimmed === '' ? 0 : trimmed.split(/\s+/).length;
 }
 
+/**
+ * Finds chase phrasing in a draft.
+ *
+ * Reported rather than stripped, because stripping "did you see my message"
+ * leaves a sentence fragment, and because the correct fix is a different
+ * message, not a shorter one. The caller rewrites or regenerates.
+ */
+export function findChasePhrases(text: string): string[] {
+  const lowered = text.toLowerCase();
+  return CHASE_PHRASES.filter((phrase) => lowered.includes(phrase));
+}
+
+/** Banned openers still present after the filler pass. */
+export function findBannedOpeners(text: string): string[] {
+  const lowered = text.toLowerCase();
+  return BANNED_OPENERS.filter((phrase) => lowered.includes(phrase));
+}
+
+/**
+ * Counts questions. The user's own guide allows exactly one follow up question
+ * per reply, so two or more is a rule break rather than a style preference.
+ */
+export function countQuestions(text: string): number {
+  return (text.match(/\?/g) ?? []).length;
+}
+
+/**
+ * True when the text is laid out as a list.
+ *
+ * Two or more list lines, or any bullet character, counts. One numbered line
+ * such as a price is not a list. Bullet points in a chat message are banned by
+ * the user's own prompt because they read as marketing copy, not a person
+ * talking. Email is the documented exception, handled by the caller.
+ */
+export function hasListMarkers(text: string): boolean {
+  if (/^\s*[\u2022\u25CF\u25AA\u2043\u00B7\-\*]\s+/m.test(text)) return true;
+  const numbered = text.match(/^\s*\d+[.)]\s+/gm) ?? [];
+  return numbered.length >= 2;
+}
+
 export type EnforceOptions = {
   channel?: string;
   /** The message type, so a proposal is not held to a WhatsApp limit. */
@@ -155,6 +255,8 @@ export function enforceStyle(text: string, options: EnforceOptions = {}): GuardR
   const filler = stripFillerOpening(dashes.text);
   const words = countWords(filler.text);
   const overBudgetBy = Math.max(0, words - budget.maxWords);
+  const questions = countQuestions(filler.text);
+  const listMarkers = hasListMarkers(filler.text);
 
   return {
     text: filler.text,
@@ -164,6 +266,13 @@ export function enforceStyle(text: string, options: EnforceOptions = {}): GuardR
       words,
       lengthOk: overBudgetBy === 0,
       overBudgetBy,
+      // Read from the cleaned text, so a chase phrase inside a removed opener is
+      // not reported twice.
+      chasePhrases: findChasePhrases(filler.text),
+      bannedOpeners: findBannedOpeners(filler.text),
+      questions,
+      overQuestioned: questions > 1,
+      hasListMarkers: listMarkers,
     },
   };
 }

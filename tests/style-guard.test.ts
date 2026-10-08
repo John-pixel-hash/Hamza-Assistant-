@@ -117,3 +117,67 @@ test('word counting is stable on edge cases', () => {
   assert.equal(countWords('one two three'), 3);
   assert.equal(countWords('line one\nline two'), 4);
 });
+
+// ------------------------------------------ chase, questions, lists -------
+
+test('chase messages are caught, since they measurably underperform', async () => {
+  const { enforceStyle, findChasePhrases } = await import('../lib/ai/style-guard.ts');
+
+  // In the user's real archive these got a 5% reply rate against 10% overall.
+  const chase = 'Hey, just checking in, did you get a chance to look at my last message?';
+  assert.ok(findChasePhrases(chase).length > 0);
+
+  const result = enforceStyle(chase, { channel: 'instagram' });
+  assert.ok(
+    result.actions.chasePhrases.length > 0,
+    'a chase must be reported so the draft can be rewritten',
+  );
+
+  // A follow up that carries something new is not a chase and must pass.
+  const useful =
+    'Saw your store still has no reviews showing. That is usually the first thing a new buyer looks for.';
+  assert.deepEqual(enforceStyle(useful, { channel: 'instagram' }).actions.chasePhrases, []);
+});
+
+test('the one question rule is enforced', async () => {
+  const { countQuestions, enforceStyle } = await import('../lib/ai/style-guard.ts');
+
+  assert.equal(countQuestions('How is it going?'), 1);
+  assert.equal(countQuestions('No question here.'), 0);
+  assert.equal(countQuestions('Are you running ads? Or organic?'), 2);
+
+  // The user's guide allows exactly one follow up question per reply.
+  const two = enforceStyle('Are you running ads? Or organic only?', { channel: 'instagram' });
+  assert.equal(two.actions.questions, 2);
+  assert.equal(two.actions.overQuestioned, true);
+
+  const one = enforceStyle('Are you running ads or organic?', { channel: 'instagram' });
+  assert.equal(one.actions.overQuestioned, false);
+});
+
+test('lists are rejected in chat messages but a price line is not a list', async () => {
+  const { hasListMarkers, enforceStyle } = await import('../lib/ai/style-guard.ts');
+
+  assert.equal(hasListMarkers('- Store build\n- Product research'), true);
+  assert.equal(hasListMarkers('1. Store build\n2. Product research'), true);
+  assert.equal(hasListMarkers('Here is the price. 1. $80 total.'), false);
+  assert.equal(hasListMarkers('The store is $80 all in and that includes everything.'), false);
+
+  const draft = enforceStyle('What you get:\n- store\n- research\n- ads', { channel: 'fiverr' });
+  assert.equal(draft.actions.hasListMarkers, true);
+});
+
+test('a clean message passes every new check', async () => {
+  const { enforceStyle } = await import('../lib/ai/style-guard.ts');
+
+  const good =
+    'The store looks solid on the surface, but there are no reviews showing anywhere. ' +
+    'That is usually the first thing a new buyer checks before they trust a brand. ' +
+    'Want me to list what else stood out?';
+
+  const result = enforceStyle(good, { channel: 'instagram' });
+  assert.deepEqual(result.actions.chasePhrases, []);
+  assert.deepEqual(result.actions.bannedOpeners, []);
+  assert.equal(result.actions.hasListMarkers, false);
+  assert.equal(result.actions.overQuestioned, false);
+});
