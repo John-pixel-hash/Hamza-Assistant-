@@ -29,6 +29,8 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
   if (!detail) notFound();
 
   const { thread, client, messages, attachments } = detail;
+  const lastFromClient =
+    [...messages].reverse().find((message) => message.role === 'client')?.content ?? null;
   const attachmentsByMessage = new Map<string, typeof attachments>();
   for (const attachment of attachments) {
     if (!attachment.message_id) continue;
@@ -62,10 +64,15 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
         </p>
       </header>
 
-      <div className="alert alert-brand mt-4">
-        Saved messages become memory. Reply drafting, next step suggestions and the em dash blocker arrive
-        in Phase 3, and every draft will need your approval before anything goes out.
-      </div>
+      {/* The panel sits above the conversation: on a phone the draft is the
+          point of opening a thread, and the history is one scroll away. The
+          client's last message is quoted inside the panel, so the context is
+          visible without scrolling at all. */}
+      <ReplyPanel
+        defaultChannel={client?.channel ?? 'instagram'}
+        lastClientMessage={lastFromClient}
+        threadId={thread.id}
+      />
 
       <section className="mt-5 space-y-3">
         {messages.length === 0 ? (
@@ -137,13 +144,6 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
           })
         )}
       </section>
-
-      {/* The reply panel sits above the composer: read the conversation, draft,
-          edit, send, then record it. */}
-      <ReplyPanel
-        defaultChannel={client?.channel ?? 'instagram'}
-        threadId={thread.id}
-      />
 
       <section className="mt-5">
         <MessageComposer threadId={thread.id} clientId={thread.client_id} defaultRole="client" />

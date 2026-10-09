@@ -4,6 +4,7 @@ import { SetupChecklist } from '@/components/setup-checklist';
 import { EmptyState } from '@/components/empty-state';
 import { StageBadge, StatTile } from '@/components/ui';
 import { getOverview } from '@/lib/data/overview';
+import { latestThreadIdsForClients } from '@/lib/data/threads';
 import { serverConfigStatus } from '@/lib/env';
 import { FOLLOWUP_LABELS, STAGE_LABELS } from '@/lib/domain';
 import { humaniseInterval, preview } from '@/lib/text/snippet';
@@ -16,6 +17,9 @@ export default async function TodayPage() {
     getOverview(),
     Promise.resolve(serverConfigStatus()),
   ]);
+  const followUpThreads = await latestThreadIdsForClients(
+    overview.followUps.map((followUp) => followUp.client_id),
+  );
 
   const checklist = [
     { label: 'Supabase project connected', done: config.supabaseUrl && config.supabaseKey },
@@ -23,7 +27,7 @@ export default async function TodayPage() {
     { label: 'Database schema installed', done: overview.schemaReady },
     { label: 'Secret key set (server only)', done: config.secretKey },
     { label: 'Google Gemini key set', done: config.googleKey },
-    { label: 'Tavily research key set', done: config.tavilyKey },
+    { label: 'Research available (Gemini grounding, Tavily optional)', done: Boolean(config.googleKey || config.tavilyKey) },
   ];
   const remaining = checklist.filter((item) => !item.done).length;
 
@@ -70,7 +74,12 @@ export default async function TodayPage() {
           <ul className="card divide-y divide-line">
             {overview.followUps.map((followUp) => (
               <li key={followUp.client_id}>
-                <Link className="flex items-center justify-between gap-3 p-4" href={`/clients/${followUp.client_id}`}>
+                <Link
+                  className="flex items-center justify-between gap-3 p-4"
+                  href={followUpThreads.get(followUp.client_id)
+                    ? `/threads/${followUpThreads.get(followUp.client_id)}`
+                    : `/clients/${followUp.client_id}`}
+                >
                   <div className="min-w-0">
                     <p className="truncate font-medium">{followUp.name}</p>
                     <p className="text-[13px] text-warn">
@@ -159,8 +168,8 @@ export default async function TodayPage() {
 const BUILD_STEPS: { label: string; done: boolean; current?: boolean }[] = [
   { label: 'Phase 0 · Architecture, schema, verified against Postgres', done: true },
   { label: 'Phase 1 · Private sign in, guarded routes, mobile shell', done: true },
-  { label: 'Phase 2 · Client hub: threads, messages, screenshots, search', done: true, current: true },
-  { label: 'Phase 3 · AI core: model switching, guardrails, telemetry', done: false },
+  { label: 'Phase 2 · Client hub: threads, messages, screenshots, search', done: true },
+  { label: 'Phase 3 · AI core: model switching, guardrails, telemetry', done: false, current: true },
   { label: 'Phase 4 · Memory engine: facts, summaries, semantic recall', done: false },
   { label: 'Phase 5 · Research engine: sourced answers, no guessing', done: false },
   { label: 'Phase 6 · Project delivery mode', done: false },

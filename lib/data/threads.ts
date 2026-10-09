@@ -63,6 +63,38 @@ export async function getClientThreads(clientId: string): Promise<ThreadSummary[
   });
 }
 
+/**
+ * The newest thread id per client, in one query. The dashboard uses this so a
+ * row in Needs attention opens the conversation itself, one tap from the reply
+ * panel, instead of the client page.
+ */
+export async function latestThreadIdsForClients(
+  clientIds: string[],
+): Promise<Map<string, string>> {
+  const result = new Map<string, string>();
+  if (!SUPABASE_CONFIGURED || clientIds.length === 0) return result;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('threads')
+    .select('id, client_id, updated_at')
+    .in('client_id', clientIds)
+    .order('updated_at', { ascending: false });
+
+  if (error) {
+    console.error('[threads] latest per client failed', error.message);
+    return result;
+  }
+
+  // Rows arrive newest first, so the first one seen per client is the latest.
+  for (const row of data ?? []) {
+    const clientId = row.client_id as string | null;
+    if (!clientId || result.has(clientId)) continue;
+    result.set(clientId, row.id as string);
+  }
+  return result;
+}
+
 export type ThreadDetail = {
   thread: {
     id: string;

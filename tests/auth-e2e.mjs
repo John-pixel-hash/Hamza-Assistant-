@@ -417,6 +417,16 @@ async function main() {
     'a real draft takes 6 to 18 seconds, so the panel has to say so',
   );
   check(
+    'the panel quotes the last client message, so context is visible without scrolling',
+    /Last from them:/i.test(threadHtml) && /Can you do 150\?/.test(threadHtml),
+    'on a phone the thread can be eighty messages long, so the panel carries the key line itself',
+  );
+  check(
+    'the panel sits above the conversation, not below it',
+    threadHtml.indexOf('Write a reply') < threadHtml.indexOf('Can you do 150?'),
+    'the draft is the point of opening a thread, so it must not hide under the history',
+  );
+  check(
     'the seeded client\'s conversation is on the page',
     /Can you do 150\?/.test(threadHtml),
     'the thread history must render for the drafting context to be visible',

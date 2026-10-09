@@ -70,9 +70,11 @@ function CopyButton({ text }: { text: string }) {
 export function ReplyPanel({
   threadId,
   defaultChannel,
+  lastClientMessage,
 }: {
   threadId: string;
   defaultChannel: string;
+  lastClientMessage?: string | null;
 }) {
   const [draftState, draftAction, drafting] = useActionState(draftReplyAction, EMPTY_DRAFT_STATE);
   const [saveState, saveAction, saving] = useActionState(saveSentAction, SAVE_SENT_INITIAL);
@@ -109,6 +111,15 @@ export function ReplyPanel({
       <p className="mt-1 text-[13px] muted">
         Paste what they sent, or leave it empty to reply to the last message in the thread.
       </p>
+
+      {lastClientMessage && (
+        <p className="mt-2 rounded-lg border border-line bg-surface p-3 text-[13px] text-ink-soft">
+          <span className="font-medium">Last from them: </span>
+          {lastClientMessage.length > 180
+            ? `${lastClientMessage.slice(0, 180)}...`
+            : lastClientMessage}
+        </p>
+      )}
 
       <form action={draftAction} className="mt-3">
         <input name="thread_id" type="hidden" value={threadId} />
