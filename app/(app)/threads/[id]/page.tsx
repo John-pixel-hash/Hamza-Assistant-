@@ -10,6 +10,14 @@ import { CHANNEL_LABELS, ROLE_LABELS, STAGE_LABELS } from '@/lib/domain';
 export const metadata: Metadata = { title: 'Thread' };
 export const dynamic = 'force-dynamic';
 
+/**
+ * The draft action can take six to thirty seconds. Vercel's free plan kills
+ * functions past ten unless the segment declares more, and sixty is the
+ * ceiling it allows. The layout sets the same value; this page is where the
+ * slow action is called, so it states it too.
+ */
+export const maxDuration = 60;
+
 const MODE_LABELS: Record<string, string> = {
   client_reply: 'Client conversation',
   project: 'Project work',
