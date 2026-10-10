@@ -20,33 +20,8 @@ import type { Tone } from '@/lib/ai/voice';
  * every time.
  */
 
-export type DraftState = {
-  error: string | null;
-  draft: string | null;
-  /** Why the second attempt was needed, or what is still wrong with it. */
-  problems: string[];
-  ok: boolean;
-  fixed: boolean;
-  attempts: number;
-  latencyMs: number;
-  /** Echoed back so the panel can show what was being replied to. */
-  incoming: string;
-  channel: string;
-};
-
-export const EMPTY_DRAFT_STATE: DraftState = {
-  error: null,
-  draft: null,
-  problems: [],
-  ok: false,
-  fixed: false,
-  attempts: 0,
-  latencyMs: 0,
-  incoming: '',
-  channel: 'instagram',
-};
-
-export type SaveSentState = { error: string | null; saved: boolean };
+import { EMPTY_DRAFT_STATE } from '@/lib/ai/draft-state';
+import type { DraftState, SaveSentState } from '@/lib/ai/draft-state';
 
 const TONES: Tone[] = ['casual', 'formal', 'short', 'detailed', 'warm', 'direct', 'unknown'];
 
@@ -55,7 +30,7 @@ function asTone(value: string): Tone {
 }
 
 /** Everything the model is allowed to know about this conversation. */
-async function loadConversation(threadId: string) {
+export async function loadConversation(threadId: string) {
   const detail = await getThread(threadId);
   if (!detail) return null;
 

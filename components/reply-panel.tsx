@@ -3,13 +3,8 @@
 import { useState } from 'react';
 import { useActionState } from 'react';
 
-import {
-  EMPTY_DRAFT_STATE,
-  draftReplyAction,
-  saveSentAction,
-  type DraftState,
-  type SaveSentState,
-} from '@/app/actions/drafts';
+import { draftReplyAction, saveSentAction } from '@/app/actions/drafts';
+import { EMPTY_DRAFT_STATE, type DraftState, type SaveSentState } from '@/lib/ai/draft-state';
 
 /**
  * The reply panel: paste what the client sent, get a draft, edit it, keep it.
