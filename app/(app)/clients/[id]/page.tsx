@@ -6,6 +6,7 @@ import { StageBadge, RoleTag } from '@/components/ui';
 import { getClientDetail, getClientFacts, getClientMessages } from '@/lib/data/clients';
 import { getClientThreads } from '@/lib/data/threads';
 import { deleteFactAction, togglePinFactAction } from '@/app/actions/facts';
+import { RELATIONSHIP_SUMMARY_KEY } from '@/lib/ai/memory';
 import { CHANNEL_LABELS, ROLE_LABELS, SOURCE_LABELS, STAGE_LABELS } from '@/lib/domain';
 import { formatMoney, humaniseInterval, preview } from '@/lib/text/snippet';
 
@@ -174,15 +175,30 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
       {/* Memory */}
       <section className="mt-5">
         <h2 className="h2 mb-3">What I know about them</h2>
-        {facts.length === 0 ? (
+        {(() => {
+          const summary =
+            facts.find((fact) => fact.key === RELATIONSHIP_SUMMARY_KEY)?.value ?? null;
+          const governable = facts.filter((fact) => fact.key !== RELATIONSHIP_SUMMARY_KEY);
+          return (
+            <>
+              {summary && (
+                <div className="card mb-3 p-4">
+                  <p className="text-[13px] font-semibold uppercase tracking-wide text-ink-faint">
+                    Relationship
+                  </p>
+                  <p className="mt-1 text-[14px]">{summary}</p>
+                </div>
+              )}
+              {governable.length === 0 && !summary ? (
           <div className="card p-4 text-[14px] muted">
             Nothing remembered yet. Save a message on any thread and the memory engine pulls the
             durable facts from it: budget, country, store link, what was promised, what was refused.
           </div>
-        ) : (
+        ) : null}
+              {governable.length > 0 && (
           <>
             <ul className="card divide-y divide-line">
-              {facts.map((fact) => (
+              {governable.map((fact) => (
                 <li key={fact.id} className="p-4">
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-[13px] font-semibold uppercase tracking-wide text-ink-faint">
@@ -212,12 +228,15 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-[12px] text-ink-faint">
-              Pinned facts survive every future extraction. A deleted fact stays deleted, because new
-              facts come from the conversations, not from old memory.
-            </p>
-          </>
-        )}
+              <p className="mt-2 text-[12px] text-ink-faint">
+                Pinned facts survive every future extraction. A deleted fact stays deleted, because new
+                facts come from the conversations, not from old memory.
+              </p>
+              </>
+            )}
+            </>
+          );
+        })()}
       </section>
 
       {/* Timeline */}

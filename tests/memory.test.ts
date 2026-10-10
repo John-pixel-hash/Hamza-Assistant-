@@ -3,7 +3,9 @@ import { test } from 'node:test';
 
 import {
   buildMemoryPrompt,
+  buildSummaryPrompt,
   parseFacts,
+  parseSummary,
   planFactWrites,
   CONFIDENCE_VALUE,
   type ExistingFact,
@@ -99,6 +101,23 @@ test('re-extracting the same value is a no-op', () => {
   ]);
   assert.equal(plan.updates.length, 0);
   assert.equal(plan.inserts.length, 0);
+});
+
+test('parseSummary refuses tiny answers and trims fences', () => {
+  assert.equal(parseSummary('```ok```'), null);
+  const clean = parseSummary('  "Fahad wants dropshipping with no inventory; quoted the starter plan."  ');
+  assert.ok(clean);
+  assert.ok(clean.startsWith('Fahad'));
+  assert.equal(parseSummary('x '.repeat(400))?.length, 600);
+});
+
+test('the summary prompt keeps old truth and carries the slice', () => {
+  const prompt = buildSummaryPrompt('old truth still true', [
+    { role: 'client', content: 'I am ready now' },
+  ]);
+  assert.match(prompt, /Keep what is still true/);
+  assert.match(prompt, /old truth still true/);
+  assert.match(prompt, /I am ready now/);
 });
 
 test('the prompt states the no-guessing rule and carries the slice', () => {

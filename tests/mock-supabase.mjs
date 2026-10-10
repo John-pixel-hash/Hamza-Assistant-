@@ -48,6 +48,15 @@ export const FIXTURE = {
   },
   facts: [
     {
+      id: '77777777-7777-4777-8777-777777777777',
+      client_id: '11111111-1111-4111-8111-111111111111',
+      key: 'relationship_summary',
+      value: 'Fiverr buyer quoted 199.99, pushing on price, ball in his court.',
+      confidence: 0.9,
+      is_pinned: false,
+      updated_at: '2026-10-02T10:00:00Z',
+    },
+    {
       id: '55555555-5555-4555-8555-555555555555',
       client_id: '11111111-1111-4111-8111-111111111111',
       key: 'budget_ceiling',

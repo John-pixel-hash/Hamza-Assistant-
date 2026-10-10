@@ -6,7 +6,14 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '../supabase/server';
 import { getModelFor } from './provider';
 import { logRun } from './telemetry';
-import { buildMemoryPrompt, parseFacts, planFactWrites } from './memory';
+import {
+  RELATIONSHIP_SUMMARY_KEY,
+  buildMemoryPrompt,
+  buildSummaryPrompt,
+  parseFacts,
+  parseSummary,
+  planFactWrites,
+} from './memory';
 import type { ExistingFact } from './memory';
 
 /**
@@ -24,6 +31,7 @@ export type MemoryPassResult = {
   ran: boolean;
   inserted: number;
   updated: number;
+  summarized: boolean;
   reason?: string;
 };
 
@@ -35,7 +43,7 @@ export async function runMemoryPass(
     userId?: string;
   },
 ): Promise<MemoryPassResult> {
-  const none: MemoryPassResult = { ran: false, inserted: 0, updated: 0 };
+  const none: MemoryPassResult = { ran: false, inserted: 0, updated: 0, summarized: false };
   try {
     const supabase = overrides?.client ?? (await createClient());
 
@@ -77,18 +85,28 @@ export async function runMemoryPass(
         return { text: result.text };
       });
 
+    const { data: current } = await supabase
+      .from('client_facts')
+      .select('id, key, value, confidence, is_pinned')
+      .eq('client_id', clientId);
+    const currentFacts = (current ?? []) as ExistingFact[];
+
     const started = Date.now();
     const answer = await generate({
       prompt: buildMemoryPrompt(messages),
       maxOutputTokens: 600,
     });
     const facts = parseFacts(answer.text);
+    const plan = planFactWrites(currentFacts, facts);
 
-    const { data: current } = await supabase
-      .from('client_facts')
-      .select('id, key, value, confidence, is_pinned')
-      .eq('client_id', clientId);
-    const plan = planFactWrites((current ?? []) as ExistingFact[], facts);
+    // The rolling relationship summary: the same slice, one more small call.
+    const currentSummary =
+      currentFacts.find((fact) => fact.key === RELATIONSHIP_SUMMARY_KEY)?.value ?? null;
+    const summaryAnswer = await generate({
+      prompt: buildSummaryPrompt(currentSummary, messages),
+      maxOutputTokens: 700,
+    });
+    const summary = parseSummary(summaryAnswer.text);
 
     for (const row of plan.inserts) {
       await supabase.from('client_facts').insert({
@@ -106,16 +124,38 @@ export async function runMemoryPass(
         .eq('id', row.id);
     }
 
+    let summarized = false;
+    if (summary && summary !== currentSummary) {
+      const existingSummary = currentFacts.find(
+        (fact) => fact.key === RELATIONSHIP_SUMMARY_KEY,
+      );
+      if (existingSummary) {
+        await supabase
+          .from('client_facts')
+          .update({ value: summary, confidence: 0.9 })
+          .eq('id', existingSummary.id);
+      } else {
+        await supabase.from('client_facts').insert({
+          user_id: userId,
+          client_id: clientId,
+          key: RELATIONSHIP_SUMMARY_KEY,
+          value: summary,
+          confidence: 0.9,
+        });
+      }
+      summarized = true;
+    }
+
     await logRun({
       task: 'extract_facts',
       resolved,
       threadId,
       latencyMs: Date.now() - started,
       status: 'ok',
-      guardrailActions: { extracted: facts.length, inserted: plan.inserts.length, updated: plan.updates.length },
+      guardrailActions: { extracted: facts.length, inserted: plan.inserts.length, updated: plan.updates.length, summarized },
     });
 
-    return { ran: true, inserted: plan.inserts.length, updated: plan.updates.length };
+    return { ran: true, inserted: plan.inserts.length, updated: plan.updates.length, summarized };
   } catch (error) {
     // Memory is a courtesy layer. Log quietly, never break the save.
     console.error('[memory] pass failed', error instanceof Error ? error.message : error);

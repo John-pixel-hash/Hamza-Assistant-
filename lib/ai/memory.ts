@@ -23,6 +23,11 @@ export type ExistingFact = {
   is_pinned: boolean;
 };
 
+/** Reserved key: the rolling relationship summary lives in client_facts so it
+ * rides the same injection path into drafts, but the fact sheet UI renders it
+ * as prose, not as a row he has to govern. */
+export const RELATIONSHIP_SUMMARY_KEY = 'relationship_summary';
+
 export const CONFIDENCE_VALUE: Record<FactConfidence, number> = {
   high: 0.9,
   medium: 0.6,
@@ -98,6 +103,42 @@ export function parseFacts(raw: string): ExtractedFact[] {
     seen.set(key, { key, value, confidence });
   }
   return [...seen.values()].slice(0, 8);
+}
+
+export function buildSummaryPrompt(
+  currentSummary: string | null,
+  messages: { role: string; content: string }[],
+): string {
+  const slice = messages
+    .map((m) => `${m.role === 'me' ? 'HAMZA' : 'CLIENT'}: ${m.content}`)
+    .join('\n')
+    .slice(-6000);
+
+  return [
+    'You keep the rolling summary of this business relationship. Read the',
+    'current summary and the newest slice of the conversation, then write the',
+    'new current summary in two or three sentences of plain words: who they',
+    'are, what was discussed, what was promised, where it stands.',
+    'Keep what is still true from the old summary, add what changed, drop what',
+    'was resolved. Only state things that were said. No padding, no dashes,',
+    'at most 600 characters. Answer with the summary text only.',
+    '',
+    `Current summary: ${currentSummary ?? 'none yet'}`,
+    '',
+    'Newest slice:',
+    slice,
+  ].join('\n');
+}
+
+/** The model answers with prose. Trim, de-fence, and refuse tiny answers. */
+export function parseSummary(raw: string): string | null {
+  const text = raw
+    .replace(/```/g, '')
+    .replace(/^[\s"'“”]+|[\s"'“”]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (text.length < 20) return null;
+  return text.slice(0, 600);
 }
 
 export type FactPlan = {

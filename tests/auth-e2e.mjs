@@ -463,6 +463,14 @@ async function main() {
     'pin protects a fact from future extraction, delete removes a wrong one',
   );
 
+  check(
+    'the relationship summary renders as prose, not as a governable row',
+    /Relationship/.test(clientPageHtml) &&
+      /ball in his court/.test(clientPageHtml) &&
+      !/relationship_summary/.test(clientPageHtml),
+    'the summary is prose he reads, the facts are rows he governs',
+  );
+
   // A client page for an id that does not exist must render a clear empty state
   // rather than leaking an error or pretending the client exists.
   const missing = await fetch(`${APP}/clients/00000000-0000-0000-0000-000000000000`, {
