@@ -35,7 +35,29 @@ facts, because the context assembler injects them.
 He must be able to see, pin and delete what the system thinks it knows. Memory
 he cannot inspect is memory he cannot trust.
 
-## 4.3 Then: rolling summaries and semantic recall
+## 4.3a Done: rolling relationship summary
 
-A maintained summary of each relationship, and embedding based search over the
-history for the questions keyword search misses.
+Every memory pass now writes a second small output: a rolling two or three
+sentence summary of the relationship, stored as the reserved fact key
+`relationship_summary`. It rides the same injection path into drafts, renders
+as a Relationship paragraph on the client page instead of a governable row,
+and replaces itself on each pass so it stays current. Backfilled across all
+live threads on 2026-10-10: 36 of 39 threads summarized, the other three were
+too small to summarize.
+
+## 4.3b: semantic recall
+
+Built and tested, waiting on one database step that only the SQL editor can do:
+
+1. `supabase/migrations/0005_vector_search.sql` adds pgvector, a 768 dimension
+   `messages.embedding` column, the `search_messages_semantic` function and an
+   HNSW index. Paste it once in Supabase, SQL Editor, New query, Run.
+2. `node --env-file=.env.local scripts/backfill-embeddings.mjs` embeds every
+   existing message (762 of them). Safe to rerun, it skips rows that already
+   have an embedding.
+3. From then on every memory pass embeds the newest messages automatically,
+   and search becomes hybrid: exact word matches first, meaning matches after.
+
+Until step 1 is done the app behaves exactly as before, full text search only.
+The embedding call itself was verified live on 2026-10-10: gemini-embedding-001
+returns 768 dimensions on the free tier.
