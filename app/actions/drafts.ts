@@ -8,6 +8,7 @@ import { getClientDetail, getClientFacts } from '@/lib/data/clients';
 import { getClientProjectContext } from '@/lib/data/projects';
 import { getThread } from '@/lib/data/threads';
 import { draftReply } from '@/lib/ai/draft';
+import { runMemoryPass } from '@/lib/ai/memory-live';
 import type { Tone } from '@/lib/ai/voice';
 
 /**
@@ -192,6 +193,11 @@ export async function saveSentAction(
     console.error('[drafts] save failed', error.message);
     return { error: 'Could not save that. Nothing was recorded.', saved: false };
   }
+
+  // The save is the learning loop: what was sent teaches the memory engine,
+  // so the next draft knows what this one did. It never blocks or breaks the
+  // save itself.
+  await runMemoryPass(threadId);
 
   revalidatePath(`/threads/${threadId}`);
   return { error: null, saved: true };

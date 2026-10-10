@@ -1,6 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+
+import { runMemoryPass } from '@/lib/ai/memory-live';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { SUPABASE_CONFIGURED } from '@/lib/env';
@@ -153,6 +155,9 @@ export async function postMessageAction(
       return { error: 'Message saved, but the attachment record failed. The file is still in storage.' };
     }
   }
+
+  // Every saved message teaches the memory engine, composer included.
+  if (thread.client_id) await runMemoryPass(threadId);
 
   revalidatePath(`/threads/${threadId}`);
   if (thread.client_id) revalidatePath(`/clients/${thread.client_id}`);
