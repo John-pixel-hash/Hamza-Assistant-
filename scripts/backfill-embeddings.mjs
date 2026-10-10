@@ -12,11 +12,27 @@ const URL = process.env.NEXT_PUBLIC_SUPABASE_URL.replace(/\/$/, '');
 const KEY = process.env.SUPABASE_SECRET_KEY;
 const MODEL = 'gemini-embedding-001';
 const DIMS = 768;
-const BATCH = 100;
+const BATCH = 40;
+const SLEEP_MS = 26000; // free tier allows 100 embed requests per minute
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const headers = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' };
 
 async function embedBatch(texts) {
+  for (let attempt = 0; attempt < 6; attempt++) {
+    try {
+      return await embedOnce(texts);
+    } catch (error) {
+      if (!String(error.message).includes('429') || attempt === 5) throw error;
+      console.log('rate limited, waiting 25s');
+      await sleep(25000);
+    }
+  }
+  throw new Error('unreachable');
+}
+
+async function embedOnce(texts) {
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:batchEmbedContents`,
     {
@@ -64,6 +80,7 @@ for (;;) {
   }
   total += rows.length;
   console.log(`embedded ${total} messages`);
+  await sleep(SLEEP_MS);
   // Every updated row now leaves the filter, so offset stays at 0.
   if (rows.length < BATCH) break;
 }

@@ -45,19 +45,17 @@ and replaces itself on each pass so it stays current. Backfilled across all
 live threads on 2026-10-10: 36 of 39 threads summarized, the other three were
 too small to summarize.
 
-## 4.3b: semantic recall
+## 4.3b Done: semantic recall
 
-Built and tested, waiting on one database step that only the SQL editor can do:
+1. Migration `0005_vector_search.sql` was applied in the SQL editor on
+   2026-10-10: pgvector, a 768 dimension `messages.embedding` column, the
+   `search_messages_semantic` function, and an HNSW index.
+2. The backfill ran the same day: all 762 messages embedded, zero nulls.
+   The free tier allows 100 embed requests per minute, so the script
+   batches 40 at a time and waits between batches.
+3. Every memory pass now embeds new messages automatically, and search is
+   hybrid: exact word matches first, meaning matches fill the rest.
 
-1. `supabase/migrations/0005_vector_search.sql` adds pgvector, a 768 dimension
-   `messages.embedding` column, the `search_messages_semantic` function and an
-   HNSW index. Paste it once in Supabase, SQL Editor, New query, Run.
-2. `node --env-file=.env.local scripts/backfill-embeddings.mjs` embeds every
-   existing message (762 of them). Safe to rerun, it skips rows that already
-   have an embedding.
-3. From then on every memory pass embeds the newest messages automatically,
-   and search becomes hybrid: exact word matches first, meaning matches after.
-
-Until step 1 is done the app behaves exactly as before, full text search only.
-The embedding call itself was verified live on 2026-10-10: gemini-embedding-001
-returns 768 dimensions on the free tier.
+Verified end to end on 2026-10-10: a query whose words appear in no message
+("he does not have money to buy stock in advance") returned the right
+conversations, led by "My account doesn't have any cash rn".
