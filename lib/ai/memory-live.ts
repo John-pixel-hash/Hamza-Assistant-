@@ -6,6 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '../supabase/server';
 import { getModelFor } from './provider';
 import { logRun } from './telemetry';
+import { embedTexts } from './embed';
 import {
   RELATIONSHIP_SUMMARY_KEY,
   buildMemoryPrompt,
@@ -32,6 +33,7 @@ export type MemoryPassResult = {
   inserted: number;
   updated: number;
   summarized: boolean;
+  embedded: number;
   reason?: string;
 };
 
@@ -43,7 +45,7 @@ export async function runMemoryPass(
     userId?: string;
   },
 ): Promise<MemoryPassResult> {
-  const none: MemoryPassResult = { ran: false, inserted: 0, updated: 0, summarized: false };
+  const none: MemoryPassResult = { ran: false, inserted: 0, updated: 0, summarized: false, embedded: 0 };
   try {
     const supabase = overrides?.client ?? (await createClient());
 
@@ -66,12 +68,12 @@ export async function runMemoryPass(
 
     const { data: rows } = await supabase
       .from('messages')
-      .select('role, content')
+      .select('id, role, content')
       .eq('thread_id', threadId)
       .order('sent_at', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(12);
-    const messages = (rows ?? []).reverse() as { role: string; content: string }[];
+    const messages = (rows ?? []).reverse() as { id: string; role: string; content: string }[];
     const chars = messages.reduce((total, m) => total + (m.content ?? '').length, 0);
     if (messages.length < 2 || chars < 40) return { ...none, reason: 'slice too small' };
 
@@ -124,6 +126,40 @@ export async function runMemoryPass(
         .eq('id', row.id);
     }
 
+    // Semantic recall: embed the slice messages that do not have an embedding
+    // yet. If the pgvector column is missing (migration not applied), the
+    // probe fails and this whole block is skipped without noise.
+    let embedded = 0;
+    const ids = messages.map((m) => m.id);
+    const { error: probeError } = await supabase.from('messages').select('embedding').limit(1);
+    if (!probeError) {
+      const { data: haveRows, error: haveError } = await supabase
+        .from('messages')
+        .select('id')
+        .in('id', ids)
+        .not('embedding', 'is', null);
+      if (!haveError) {
+        const have = new Set(((haveRows ?? []) as { id: string }[]).map((row) => row.id));
+        const missing = messages.filter((m) => !have.has(m.id));
+        if (missing.length > 0) {
+          const { embeddings } = await embedTexts(missing.map((m) => m.content));
+          if (embeddings) {
+            for (let i = 0; i < missing.length; i++) {
+              const vector = embeddings[i];
+              const target = missing[i];
+              if (!vector || !target) break;
+              const { error } = await supabase
+                .from('messages')
+                .update({ embedding: vector })
+                .eq('id', target.id);
+              if (error) break;
+              embedded++;
+            }
+          }
+        }
+      }
+    }
+
     let summarized = false;
     if (summary && summary !== currentSummary) {
       const existingSummary = currentFacts.find(
@@ -152,10 +188,10 @@ export async function runMemoryPass(
       threadId,
       latencyMs: Date.now() - started,
       status: 'ok',
-      guardrailActions: { extracted: facts.length, inserted: plan.inserts.length, updated: plan.updates.length, summarized },
+      guardrailActions: { extracted: facts.length, inserted: plan.inserts.length, updated: plan.updates.length, summarized, embedded },
     });
 
-    return { ran: true, inserted: plan.inserts.length, updated: plan.updates.length, summarized };
+    return { ran: true, inserted: plan.inserts.length, updated: plan.updates.length, summarized, embedded };
   } catch (error) {
     // Memory is a courtesy layer. Log quietly, never break the save.
     console.error('[memory] pass failed', error instanceof Error ? error.message : error);
