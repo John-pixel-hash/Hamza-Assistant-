@@ -129,6 +129,10 @@ function stats(text) {
   };
 }
 
+// The doc is house style. Dashes in quoted history are normalised here,
+// while the database keeps the originals.
+const normalise = (text) => text.replace(/[\u2013\u2014\u2012\u2015\u2212]/g, ' to ');
+
 function statLine(s) {
   return `${s.words} words, ${s.questions} question${s.questions === 1 ? '' : 's'}, ` +
     `${s.chase} chase, ${s.dashes} dash${s.dashes === 1 ? '' : 'es'}, ` +
@@ -203,19 +207,19 @@ for (const r of results) {
   md.push('');
   md.push('**They said:**');
   md.push('');
-  md.push('> ' + r.incoming.replace(/\n+/g, ' '));
+  md.push('> ' + normalise(r.incoming.replace(/\n+/g, ' ')));
   md.push('');
   md.push(`**The pipeline wrote today** on ${r.model} (${r.attempts} attempt${r.attempts === 1 ? '' : 's'}, ` +
     `${(r.latencyMs / 1000).toFixed(1)}s${r.draftOk ? '' : ', still flagged'}):`);
   md.push('');
-  md.push('> ' + r.draft.replace(/\n+/g, ' '));
+  md.push('> ' + normalise(r.draft.replace(/\n+/g, ' ')));
   md.push('');
   md.push(`Guard: ${statLine(stats(r.draft))}`);
   if (r.problems.length > 0) md.push(`Flagged: ${r.problems.join('; ')}`);
   md.push('');
   md.push('**What was actually sent back then:**');
   md.push('');
-  md.push('> ' + r.actual.replace(/\n+/g, ' '));
+  md.push('> ' + normalise(r.actual.replace(/\n+/g, ' ')));
   md.push('');
   md.push(`Guard: ${statLine(stats(r.actual))}`);
   md.push('');

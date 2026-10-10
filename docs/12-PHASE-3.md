@@ -145,8 +145,9 @@ fine-tuning, nothing that changes rules behind your back.
 | 3.2 | `voice.ts` and `context.ts` | **Done.** 11 tests on the assembled prompt, no model calls |
 | 3.3 | `draft-core.ts`, `draft.ts` | **Done.** 10 tests on the loop, plus two real drafts on live conversations |
 | 3.4 | The reply panel | **Done.** Five checks in the auth harness prove it renders for the owner on a real thread |
-| 3.5 | Replay against the archive | Ten real client messages from engaged threads, drafted, guard scored, compared with what you actually sent |
+| 3.5 | Replay against the archive | **Done.** Nine real conversations replayed and set beside what was actually sent (docs/13). Owner verdict on 2026-10-10: "this is exactly how i would sound i love it" |
 | 3.6 | Screenshot reading | A real screenshot from your phone, extracted, then drafted |
+| 3.7 | Tone auto detection | **Done.** A pasted message is scored by the lite model and the picker preselects the read, unless he overrides it |
 | 3.7 | The learning loop | Your sent version stored beside the draft, and the diff visible |
 
 Step 3.5 is the honest one. It is the closest thing to a fair test that exists

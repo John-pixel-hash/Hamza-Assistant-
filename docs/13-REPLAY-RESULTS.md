@@ -9,7 +9,9 @@ from the thread, exactly as the panel does by default.
 Each case shows the client's last message, the draft the pipeline wrote
 today, and the reply that was actually sent back then. Both texts go through
 the same style guard, so the numbers are comparable. The real replies are
-history, so their dashes and chase lines appear as sent, on purpose.
+history, so their chase lines appear as sent, on purpose. Where a sent
+message contained a dash, the quote shows the house style instead, and the
+database keeps the original untouched.
 
 ## invictus (36 from him, 45 from them)
 
@@ -43,7 +45,7 @@ Guard: 82 words, 1 question, 0 chase, 0 dashes, no lists, 0 banned openers
 
 **What was actually sent back then:**
 
-> To clear it up there's no single "cost per ad," Meta charges based on your daily budget, not per ad itself. On the 7,000 Rs question that's not all-inclusive. Product cost, ad spend, and my setup fee are three separate things. Roughly: product cost is whatever the supplier charges per unit (varies by product), ad testing budget is separate on top of that (the 1,500–2,500/day I mentioned), and my fee for building the store is separate again. On suppliers you don't ship anything to them, it works the other way. You find a supplier through platforms like AliExpress or CJ Dropshipping, list their product on your store at your price, and when a customer orders, you place that same order with the supplier using the customer's address. The supplier ships straight to your customer, you never handle the product.
+> To clear it up there's no single "cost per ad," Meta charges based on your daily budget, not per ad itself. On the 7,000 Rs question that's not all-inclusive. Product cost, ad spend, and my setup fee are three separate things. Roughly: product cost is whatever the supplier charges per unit (varies by product), ad testing budget is separate on top of that (the 1,500 to 2,500/day I mentioned), and my fee for building the store is separate again. On suppliers you don't ship anything to them, it works the other way. You find a supplier through platforms like AliExpress or CJ Dropshipping, list their product on your store at your price, and when a customer orders, you place that same order with the supplier using the customer's address. The supplier ships straight to your customer, you never handle the product.
 
 Guard: 139 words, 0 questions, 0 chase, 1 dash, no lists, 0 banned openers
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useActionState } from 'react';
 
 import { draftReplyAction, saveSentAction } from '@/app/actions/drafts';
@@ -81,6 +81,36 @@ export function ReplyPanel({
   const [tone, setTone] = useState('unknown');
   const [text, setText] = useState('');
 
+  // Paste a client message and the lite model reads its tone, then preselects
+  // it here, unless he has already picked one himself. A courtesy, not a gate:
+  // the draft reads the tone from the thread either way.
+  const [detectedTone, setDetectedTone] = useState<string | null>(null);
+  const toneTouched = useRef(false);
+
+  useEffect(() => {
+    if (incoming.trim().length < 12) {
+      setDetectedTone(null);
+      return;
+    }
+    const handle = window.setTimeout(async () => {
+      try {
+        const response = await fetch('/api/tone', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: incoming }),
+        });
+        if (!response.ok) return;
+        const data = (await response.json()) as { tone?: string };
+        const read = data.tone ?? 'unknown';
+        setDetectedTone(read);
+        if (!toneTouched.current) setTone(read);
+      } catch {
+        // The tone read failing must never break the panel.
+      }
+    }, 600);
+    return () => window.clearTimeout(handle);
+  }, [incoming]);
+
   // When a new draft arrives it goes into the editable box. Adjusting state
   // during render is the documented React pattern for a value derived from a
   // changing source, and it means the box never shows a stale draft.
@@ -160,7 +190,10 @@ export function ReplyPanel({
               className="field mt-1"
               id="tone"
               name="tone"
-              onChange={(event) => setTone(event.target.value)}
+              onChange={(event) => {
+                toneTouched.current = true;
+                setTone(event.target.value);
+              }}
               value={tone}
             >
               {TONES.map((option) => (
@@ -169,6 +202,13 @@ export function ReplyPanel({
                 </option>
               ))}
             </select>
+            {detectedTone && detectedTone !== 'unknown' && (
+              <p className="mt-1 text-[12px] text-ink-faint">
+                {toneTouched.current
+                  ? `read as ${detectedTone}, you chose ${tone}`
+                  : 'read from their message'}
+              </p>
+            )}
           </div>
         </div>
 
