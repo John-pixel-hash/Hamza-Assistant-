@@ -62,6 +62,10 @@ export const ALLOWED_MODELS: Record<string, string[]> = {
   ],
 };
 
+/** When the primary draft model exhausts its free daily quota, drafts go
+ * here. The lite model has its own allowance, so the button keeps working. */
+export const DRAFT_FALLBACK_MODEL = 'gemini-3.1-flash-lite';
+
 export const DEFAULT_ROUTING: Record<AiTask, { provider: string; modelId: string }> = {
   reply_draft: { provider: 'google', modelId: 'gemini-3.5-flash' },
   plan: { provider: 'google', modelId: 'gemini-3.5-flash' },

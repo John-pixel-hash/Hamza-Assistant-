@@ -119,6 +119,7 @@ export async function draftReplyAction(
       fixed: outcome.fixed,
       attempts: outcome.attempts,
       latencyMs: outcome.latencyMs,
+      modelId: outcome.modelId,
       incoming,
       channel,
     };

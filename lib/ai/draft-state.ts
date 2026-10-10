@@ -10,6 +10,8 @@ export type DraftState = {
   fixed: boolean;
   attempts: number;
   latencyMs: number;
+  /** Which model actually wrote the draft, after any quota fallback. */
+  modelId: string | null;
   /** Echoed back so the panel can show what was being replied to. */
   incoming: string;
   channel: string;
@@ -23,6 +25,7 @@ export const EMPTY_DRAFT_STATE: DraftState = {
   fixed: false,
   attempts: 0,
   latencyMs: 0,
+  modelId: null,
   incoming: '',
   channel: 'instagram',
 };

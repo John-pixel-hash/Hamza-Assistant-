@@ -99,6 +99,7 @@ export function ReplyPanel({
           <span className="text-[12px] text-ink-faint">
             {draftState.attempts === 1 ? 'first attempt' : 'repaired once'} ·{' '}
             {(draftState.latencyMs / 1000).toFixed(1)}s
+            {draftState.modelId ? ` · ${draftState.modelId.replace('gemini-', '')}` : ''}
           </span>
         )}
       </div>
