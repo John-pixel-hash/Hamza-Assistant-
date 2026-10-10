@@ -15,6 +15,12 @@ and no drag and drop upload is ever needed again. The 39 engaged Instagram
 conversations are already imported, by the API route rather than the SQL editor
 route, recorded in doc 07.
 
+One Vercel free plan trap worth knowing: any request that runs past ten seconds
+is killed, which looks like a random crash. The app's layout sets
+`maxDuration = 60`, the free plan ceiling, so slow work like reply drafting
+survives. If a future feature starts timing out, that is the first place to
+look.
+
 To confirm a deploy went live without opening any dashboard:
 
 ```bash
