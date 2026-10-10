@@ -46,6 +46,26 @@ export const FIXTURE = {
     summary: 'Fiverr buyer, quoted 199.99, pushing on price.',
     notes: null,
   },
+  facts: [
+    {
+      id: '55555555-5555-4555-8555-555555555555',
+      client_id: '11111111-1111-4111-8111-111111111111',
+      key: 'budget_ceiling',
+      value: '150, will not go higher',
+      confidence: 0.9,
+      is_pinned: false,
+      updated_at: '2026-10-02T10:00:00Z',
+    },
+    {
+      id: '66666666-6666-4666-8666-666666666666',
+      client_id: '11111111-1111-4111-8111-111111111111',
+      key: 'platform',
+      value: 'Fiverr only, never off platform',
+      confidence: 0.9,
+      is_pinned: true,
+      updated_at: '2026-10-02T10:00:00Z',
+    },
+  ],
   thread: {
     id: '22222222-2222-4222-8222-222222222222',
     title: 'Simon, Fiverr order',
@@ -232,6 +252,10 @@ const server = createServer(async (req, res) => {
 
       if (table === 'client_overview' && idFilter === `eq.${FIXTURE.clientId}`) {
         return json(res, 200, FIXTURE.client);
+      }
+
+      if (table === 'client_facts' && url.searchParams.get('client_id') === `eq.${FIXTURE.clientId}`) {
+        return json(res, 200, FIXTURE.facts);
       }
 
       if (wantsSingleObject) {

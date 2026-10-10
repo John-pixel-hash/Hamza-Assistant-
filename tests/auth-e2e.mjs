@@ -11,6 +11,8 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
+
+import { FIXTURE } from './mock-supabase.mjs';
 import { setTimeout as sleep } from 'node:timers/promises';
 
 /**
@@ -440,6 +442,25 @@ async function main() {
     'a thread that does not exist returns a clean not found',
     missingThread.status === 404,
     `status ${missingThread.status}`,
+  );
+
+  const clientPageRes = await fetch(`${APP}/clients/${FIXTURE.clientId}`, {
+    headers: cookieHeader,
+    redirect: 'manual',
+  });
+  const clientPageHtml = await clientPageRes.text();
+  check(
+    'the client page shows the fact sheet he can govern',
+    clientPageRes.status === 200 &&
+      /What I know about them/.test(clientPageHtml) &&
+      /150, will not go higher/.test(clientPageHtml),
+    'memory he cannot inspect is memory he cannot trust',
+  );
+  check(
+    'every fact carries a pin and a delete control',
+    (clientPageHtml.match(/>Pin</g) ?? []).length + (clientPageHtml.match(/>Unpin</g) ?? []).length === 2 &&
+      (clientPageHtml.match(/>Delete</g) ?? []).length === 2,
+    'pin protects a fact from future extraction, delete removes a wrong one',
   );
 
   // A client page for an id that does not exist must render a clear empty state

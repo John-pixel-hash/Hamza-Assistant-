@@ -5,6 +5,7 @@ import { NewThreadForm } from '@/components/new-thread-form';
 import { StageBadge, RoleTag } from '@/components/ui';
 import { getClientDetail, getClientFacts, getClientMessages } from '@/lib/data/clients';
 import { getClientThreads } from '@/lib/data/threads';
+import { deleteFactAction, togglePinFactAction } from '@/app/actions/facts';
 import { CHANNEL_LABELS, ROLE_LABELS, SOURCE_LABELS, STAGE_LABELS } from '@/lib/domain';
 import { formatMoney, humaniseInterval, preview } from '@/lib/text/snippet';
 
@@ -175,21 +176,47 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
         <h2 className="h2 mb-3">What I know about them</h2>
         {facts.length === 0 ? (
           <div className="card p-4 text-[14px] muted">
-            Nothing extracted yet. In Phase 4 the assistant reads your saved messages and pulls out the
-            details that matter: budget signals, who decides, what you promised and when.
+            Nothing remembered yet. Save a message on any thread and the memory engine pulls the
+            durable facts from it: budget, country, store link, what was promised, what was refused.
           </div>
         ) : (
-          <ul className="card divide-y divide-line">
-            {facts.map((fact) => (
-              <li key={fact.id} className="p-4">
-                <div className="flex items-center gap-2">
-                  <p className="text-[13px] font-semibold uppercase tracking-wide text-ink-faint">{fact.key}</p>
-                  {fact.is_pinned && <span className="text-[11px] font-semibold text-gold">Pinned</span>}
-                </div>
-                <p className="mt-1 break-words">{fact.value}</p>
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="card divide-y divide-line">
+              {facts.map((fact) => (
+                <li key={fact.id} className="p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-[13px] font-semibold uppercase tracking-wide text-ink-faint">
+                      {fact.key}
+                      {fact.is_pinned && (
+                        <span className="ml-2 text-[11px] font-semibold normal-case text-gold">Pinned</span>
+                      )}
+                    </p>
+                    <div className="flex shrink-0 gap-2">
+                      <form action={togglePinFactAction}>
+                        <input name="fact_id" type="hidden" value={fact.id} />
+                        <input name="client_id" type="hidden" value={client.id} />
+                        <button className="btn btn-quiet btn-small" type="submit">
+                          {fact.is_pinned ? 'Unpin' : 'Pin'}
+                        </button>
+                      </form>
+                      <form action={deleteFactAction}>
+                        <input name="fact_id" type="hidden" value={fact.id} />
+                        <input name="client_id" type="hidden" value={client.id} />
+                        <button className="btn btn-quiet btn-small text-danger" type="submit">
+                          Delete
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                  <p className="mt-1 break-words">{fact.value}</p>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-[12px] text-ink-faint">
+              Pinned facts survive every future extraction. A deleted fact stays deleted, because new
+              facts come from the conversations, not from old memory.
+            </p>
+          </>
         )}
       </section>
 
