@@ -337,7 +337,7 @@ async function main() {
     'the dashboard must never claim an old phase',
   );
 
-  for (const path of ['/clients', '/clients/new', '/chat', '/search', '/projects', '/settings']) {
+  for (const path of ['/clients', '/clients/new', '/chat', '/research', '/search', '/projects', '/settings']) {
     const res = await fetch(`${APP}${path}`, { headers: cookieHeader, redirect: 'manual' });
     check(`owner reaches ${path}`, res.status === 200, `status ${res.status}`);
   }

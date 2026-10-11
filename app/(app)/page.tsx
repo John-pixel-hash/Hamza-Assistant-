@@ -27,7 +27,7 @@ export default async function TodayPage() {
     { label: 'Database schema installed', done: overview.schemaReady },
     { label: 'Secret key set (server only)', done: config.secretKey },
     { label: 'Google Gemini key set', done: config.googleKey },
-    { label: 'Research available (Gemini grounding, Tavily optional)', done: Boolean(config.googleKey || config.tavilyKey) },
+    { label: 'Research live once a free Tavily key is in Settings', done: Boolean(config.tavilyKey) },
   ];
   const remaining = checklist.filter((item) => !item.done).length;
 
@@ -38,9 +38,12 @@ export default async function TodayPage() {
           <p className="eyebrow">{todayLine()}</p>
           <h1 className="h1 mt-1">Today</h1>
         </div>
-        <div className="flex shrink-0 gap-2">
+        <div className="flex shrink-0 flex-wrap justify-end gap-2">
           <Link className="btn btn-primary" href="/chat">
             Chat
+          </Link>
+          <Link className="btn btn-quiet" href="/research">
+            Research
           </Link>
           <Link className="btn btn-primary btn-small shrink-0" href="/clients/new">
             Add client
@@ -176,8 +179,8 @@ const BUILD_STEPS: { label: string; done: boolean; current?: boolean }[] = [
   { label: 'Phase 2 · Client hub: threads, messages, screenshots, search', done: true },
   { label: 'Phase 3 · AI core: model switching, guardrails, telemetry', done: true },
   { label: 'Phase 4 · Memory engine: facts, summaries, semantic recall', done: true },
-  { label: 'Phase 5 · Research engine: sourced answers, no guessing', done: false, current: true },
-  { label: 'Phase 6 · Project delivery mode', done: false },
+  { label: 'Phase 5 · Research engine: sourced answers, no guessing', done: true },
+  { label: 'Phase 6 · Project delivery mode', done: false, current: true },
   { label: 'Phase 7 · The nine domain playbooks', done: false },
   { label: 'Phase 8 · Hardening, cost dashboard, documentation', done: false },
 ];
