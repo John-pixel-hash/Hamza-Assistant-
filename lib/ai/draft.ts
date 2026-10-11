@@ -122,7 +122,7 @@ export function aiSdkGenerator(model: LanguageModel): GenerateFn {
       maxOutputTokens,
       // One shot per model, hard capped. The quota/spike fallback owns
       // retries, because SDK backoff can eat the 60 second serverless budget.
-      abortSignal: AbortSignal.timeout(30000),
+      abortSignal: AbortSignal.timeout(25000),
     });
     return {
       text: result.text,
