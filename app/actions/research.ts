@@ -1,6 +1,7 @@
 'use server';
 
 import { researchQuestion } from '@/lib/ai/research';
+import { getStoredTavilyKey } from '@/lib/data/secrets';
 
 export type ResearchState = {
   question: string;
@@ -24,7 +25,8 @@ export async function researchAction(
     };
   }
 
-  const result = await researchQuestion(question);
+  const storedKey = await getStoredTavilyKey();
+  const result = await researchQuestion(question, { tavilyKey: storedKey ?? undefined });
 
   if (result.reason === 'no search provider') {
     return {

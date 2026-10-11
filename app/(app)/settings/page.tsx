@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { getSystemStatus } from '@/lib/data/status';
 import { serverConfigStatus } from '@/lib/env';
 import { signOut } from '@/app/actions/auth';
+import { ResearchKeyForm } from '@/components/research-key-form';
+import { getStoredTavilyKey } from '@/lib/data/secrets';
 import { todayUsage } from '@/lib/ai/telemetry';
 import { DEFAULT_ROUTING } from '@/lib/ai/routing';
 
@@ -18,10 +20,11 @@ const STATUS_LABELS: { key: string; label: string; help: string }[] = [
 ];
 
 export default async function SettingsPage() {
-  const [status, config, usage] = await Promise.all([
+  const [status, config, usage, storedTavily] = await Promise.all([
     getSystemStatus(),
     Promise.resolve(serverConfigStatus()),
     todayUsage(),
+    getStoredTavilyKey(),
   ]);
 
   return (
@@ -61,6 +64,14 @@ export default async function SettingsPage() {
             );
           })}
         </ul>
+      </section>
+
+      <section className="mb-6">
+        <h2 className="mb-3 text-[15px] font-semibold">Research key</h2>
+        <ResearchKeyForm
+          hasStoredKey={Boolean(storedTavily)}
+          hasEnvKey={Boolean(config.tavilyKey)}
+        />
       </section>
 
       <section className="mb-6">

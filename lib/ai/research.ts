@@ -79,8 +79,9 @@ export function parseGroundingResponse(payload: unknown): {
 async function tavilySearch(
   question: string,
   doFetch: typeof fetch,
+  tavilyKey?: string,
 ): Promise<ResearchSource[] | null> {
-  const key = process.env.TAVILY_API_KEY;
+  const key = tavilyKey ?? process.env.TAVILY_API_KEY;
   if (!key) return null;
   try {
     const response = await doFetch('https://api.tavily.com/search', {
@@ -189,11 +190,11 @@ async function synthesize(
 
 export async function researchQuestion(
   question: string,
-  overrides?: { fetchImpl?: typeof fetch },
+  overrides?: { fetchImpl?: typeof fetch; tavilyKey?: string },
 ): Promise<ResearchResult> {
   const doFetch = overrides?.fetchImpl ?? fetch;
 
-  let sources = await tavilySearch(question, doFetch);
+  let sources = await tavilySearch(question, doFetch, overrides?.tavilyKey);
   if (!sources || sources.length === 0) {
     sources = await groundingSearch(question, doFetch);
   }
@@ -202,7 +203,7 @@ export async function researchQuestion(
       answer: null,
       sources: [],
       modelId: null,
-      reason: process.env.TAVILY_API_KEY ? 'search failed' : 'no search provider',
+      reason: overrides?.tavilyKey || process.env.TAVILY_API_KEY ? 'search failed' : 'no search provider',
     };
   }
 
