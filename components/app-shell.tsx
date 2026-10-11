@@ -7,6 +7,7 @@ import { BrandMark } from '@/components/brand-mark';
 
 const NAV = [
   { href: '/', label: 'Today', icon: 'M4 11.5 12 4l8 7.5V20a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z' },
+  { href: '/chat', label: 'Chat', icon: 'M4 4h16v12H8.8L4 20V4z' },
   { href: '/clients', label: 'Clients', icon: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-8 8c0-3.3 3.6-5 8-5s8 1.7 8 5v1H4z' },
   { href: '/search', label: 'Search', icon: 'M10.5 3a7.5 7.5 0 1 0 4.6 13.4l4.2 4.2 1.4-1.4-4.2-4.2A7.5 7.5 0 0 0 10.5 3Zm0 2a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11Z' },
   { href: '/projects', label: 'Projects', icon: 'M4 5h16v4H4zM4 12h10v7H4zM17 12h3v7h-3z' },

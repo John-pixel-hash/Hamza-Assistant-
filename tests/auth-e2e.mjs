@@ -322,6 +322,12 @@ async function main() {
     `status ${today.status}`,
   );
 
+  check(
+    'the bottom nav carries the Chat tab and the dashboard keeps Add client',
+    todayHtml.includes('>Chat<') && todayHtml.includes('Add client'),
+    'Chat joins the nav without eating the existing entry point',
+  );
+
   const p4 = todayHtml.indexOf('Phase 4 · Memory engine');
   const p5 = todayHtml.indexOf('Phase 5 · Research engine');
   const here = todayHtml.indexOf('you are here');
@@ -331,7 +337,7 @@ async function main() {
     'the dashboard must never claim an old phase',
   );
 
-  for (const path of ['/clients', '/clients/new', '/search', '/projects', '/settings']) {
+  for (const path of ['/clients', '/clients/new', '/chat', '/search', '/projects', '/settings']) {
     const res = await fetch(`${APP}${path}`, { headers: cookieHeader, redirect: 'manual' });
     check(`owner reaches ${path}`, res.status === 200, `status ${res.status}`);
   }

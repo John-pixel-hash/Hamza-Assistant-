@@ -38,9 +38,14 @@ export default async function TodayPage() {
           <p className="eyebrow">{todayLine()}</p>
           <h1 className="h1 mt-1">Today</h1>
         </div>
-        <Link className="btn btn-primary btn-small shrink-0" href="/clients/new">
-          Add client
-        </Link>
+        <div className="flex shrink-0 gap-2">
+          <Link className="btn btn-primary" href="/chat">
+            Chat
+          </Link>
+          <Link className="btn btn-primary btn-small shrink-0" href="/clients/new">
+            Add client
+          </Link>
+        </div>
       </div>
 
       {overview.connected && !overview.schemaReady && (
