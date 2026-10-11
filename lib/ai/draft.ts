@@ -55,8 +55,15 @@ export async function draftReply(
 ): Promise<DraftOutcome & { modelId: string }> {
   const { model, resolved } = await getModelFor('reply_draft');
 
-  let usedModel = model;
-  let usedResolved = resolved;
+  // The capture flow lives inside a 60 second serverless window, so it starts
+  // on the fast model. The reply panel keeps the primary voice.
+  const startFast = request.fast === true && resolved.modelId !== DRAFT_FALLBACK_MODEL;
+  let usedModel = startFast
+    ? modelFor({ ...resolved, modelId: DRAFT_FALLBACK_MODEL })
+    : model;
+  let usedResolved = startFast
+    ? { ...resolved, modelId: DRAFT_FALLBACK_MODEL, reason: 'capture fast path' }
+    : resolved;
   let quotaFallback = false;
   let outcome: DraftOutcome;
 
@@ -108,7 +115,15 @@ export async function draftReply(
 /** The real generator, using whichever model the task routes to. */
 export function aiSdkGenerator(model: LanguageModel): GenerateFn {
   return async ({ system, prompt, maxOutputTokens }) => {
-    const result = await generateText({ model, system, prompt, maxOutputTokens });
+    const result = await generateText({
+      model,
+      system,
+      prompt,
+      maxOutputTokens,
+      // One shot per model, hard capped. The quota/spike fallback owns
+      // retries, because SDK backoff can eat the 60 second serverless budget.
+      abortSignal: AbortSignal.timeout(30000),
+    });
     return {
       text: result.text,
       inputTokens: result.usage?.inputTokens ?? null,

@@ -1,7 +1,6 @@
 import { revalidatePath } from 'next/cache';
 
 import { draftReply } from '@/lib/ai/draft';
-import { runMemoryPass } from '@/lib/ai/memory-live';
 import { readConversationScreenshot } from '@/lib/ai/vision';
 import type { Tone } from '@/lib/ai/voice';
 import { getClientDetail, getClientFacts } from '@/lib/data/clients';
@@ -194,9 +193,6 @@ export async function captureChatScreenshot(
   revalidatePath('/clients');
   revalidatePath(`/clients/${clientId}`);
 
-  // Teach the memory engine before drafting, so the reply already uses it.
-  await runMemoryPass(threadId);
-
   const detail = await getThread(threadId);
   if (!detail) return { ok: false, error: 'The thread disappeared while I was working.' };
   const [clientResult, facts, projects] = await Promise.all([
@@ -207,9 +203,15 @@ export async function captureChatScreenshot(
   const clientRow = clientResult.client;
 
   const tone = asTone(extraction.tone);
+
+  // The reply is written from the message itself plus what was already known.
+  // The memory pass deliberately does NOT run here: it has its own route that
+  // the browser fires right after the reply lands, so the action stays inside
+  // the 60 second serverless budget.
   let draft;
   try {
     draft = await draftReply({
+        fast: true,
     channel: platform,
     tone,
     purpose: 'reply',

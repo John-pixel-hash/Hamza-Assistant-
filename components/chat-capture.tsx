@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useActionState, useRef, useState } from 'react';
+import { useActionState, useEffect, useRef, useState } from 'react';
 
 import { chatCaptureAction, EMPTY_CHAT_STATE } from '@/app/actions/chat';
 import { CHANNEL_LABELS, type Channel } from '@/lib/domain';
@@ -63,6 +63,17 @@ export function ChatCapture() {
       setCopied(false);
     }
   }
+
+  // Remember second: the pass runs in its own request, outside the capture's
+  // serverless time box. Fire and forget; the reply never waits for it.
+  useEffect(() => {
+    if (!state.ok || !state.threadId) return;
+    fetch('/api/chat-memory', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ threadId: state.threadId }),
+    }).catch(() => undefined);
+  }, [state.ok, state.threadId]);
 
   const platformLabel =
     state.platform && state.platform !== 'unknown'

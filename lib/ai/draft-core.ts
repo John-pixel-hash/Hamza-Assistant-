@@ -34,6 +34,8 @@ export type DraftRequest = {
   purpose?: VoiceOptions['purpose'];
   /** Extra instruction for this one draft, from the user typing a hint. */
   instruction?: string | null;
+  /** Start on the fast model: used by flows inside the serverless time box. */
+  fast?: boolean;
   channel?: string;
 };
 

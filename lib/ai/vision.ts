@@ -32,12 +32,15 @@ export async function readConversationScreenshot(image: {
   const started = Date.now();
   const { model, resolved } = await getModelFor('vision');
 
-  const candidates = [
-    { handle: model, modelId: resolved.modelId },
-    ...(resolved.modelId === VISION_FALLBACK_MODEL
-      ? []
-      : [{ handle: modelFor({ ...resolved, modelId: VISION_FALLBACK_MODEL }), modelId: VISION_FALLBACK_MODEL }]),
-  ];
+  // Lite first because it is quick, flash second because it is often healthy
+  // when lite spikes. Deduped so an override row never doubles a call.
+  const chain = [resolved.modelId, VISION_FALLBACK_MODEL, 'gemini-3.5-flash'].filter(
+    (modelId, index, list) => list.indexOf(modelId) === index,
+  );
+  const candidates = chain.map((modelId) => ({
+    handle: modelId === resolved.modelId ? model : modelFor({ ...resolved, modelId }),
+    modelId,
+  }));
 
   let lastError: unknown = null;
   for (const candidate of candidates) {
@@ -54,6 +57,9 @@ export async function readConversationScreenshot(image: {
           },
         ],
         maxOutputTokens: 1200,
+        // Our own candidate loop owns retries. SDK retries would burn seconds
+        // inside a server action that has a hard 60 second budget.
+        abortSignal: AbortSignal.timeout(15000),
       });
       const extraction = parseVisionJson(answer.text);
       await logRun({

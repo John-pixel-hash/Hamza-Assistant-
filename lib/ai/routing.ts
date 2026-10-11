@@ -70,7 +70,7 @@ export const DEFAULT_ROUTING: Record<AiTask, { provider: string; modelId: string
   reply_draft: { provider: 'google', modelId: 'gemini-3.5-flash' },
   plan: { provider: 'google', modelId: 'gemini-3.5-flash' },
   research_synth: { provider: 'google', modelId: 'gemini-3.5-flash' },
-  vision: { provider: 'google', modelId: 'gemini-3.5-flash' },
+  vision: { provider: 'google', modelId: 'gemini-3.1-flash-lite' },
   summarize: { provider: 'google', modelId: 'gemini-3.5-flash' },
   classify: { provider: 'google', modelId: 'gemini-3.1-flash-lite' },
   extract_facts: { provider: 'google', modelId: 'gemini-3.1-flash-lite' },
