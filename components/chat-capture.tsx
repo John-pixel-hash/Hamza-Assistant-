@@ -106,6 +106,24 @@ export function ChatCapture() {
           {state.createdClient && (
             <span className="rounded-full bg-line px-2 py-0.5 text-[11px] font-semibold">New client</span>
           )}
+          {state.threadTitle && (
+            <>
+              <span>·</span>
+              <span>{state.threadTitle}</span>
+            </>
+          )}
+          {typeof state.addedMessages === 'number' && (
+            <>
+              <span>·</span>
+              <span>
+                {state.addedMessages === 0
+                  ? 'nothing new to add, drafted from history'
+                  : state.addedMessages === 1
+                    ? '1 new message added'
+                    : `${state.addedMessages} new messages added`}
+              </span>
+            </>
+          )}
         </div>
       )}
 

@@ -24,6 +24,20 @@ the right client.
 3. The result screen shows the reply with a Copy button, an Open client link,
    and the extracted text in a details box so nothing is a black box.
 
+## Appending to existing threads, without doubling
+
+A capture lands on the freshest thread that already carries the detected
+platform, so a client with an imported Instagram history gets the new
+screenshot appended to that same thread. A new thread is only created when
+the platform has none. Every extracted line is checked against the thread's
+existing messages (same speaker, same words, case and spacing folded) and
+skipped when already saved, so the overlap between history and screenshot
+disappears. The result screen states how many new messages were added, or
+that nothing was new and the reply came from history.
+
+Verified live on 2026-10-11 with a seeded thread: first capture added exactly
+the one new line, second capture added zero, thread count stayed one.
+
 ## Deliberate fallbacks
 
 - No visible name in the screenshot: the same screen asks for the name once

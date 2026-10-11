@@ -6,6 +6,7 @@ import type { Tone } from '@/lib/ai/voice';
 import { getClientDetail, getClientFacts } from '@/lib/data/clients';
 import { getClientProjectContext } from '@/lib/data/projects';
 import { getThread } from '@/lib/data/threads';
+import { dedupeKey, pickThread } from '@/lib/chat/threads';
 import { CHANNEL_LABELS, type Channel } from '@/lib/domain';
 import { createClient } from '@/lib/supabase/server';
 
@@ -20,6 +21,8 @@ export type ChatCaptureResult = {
   clientId?: string;
   threadId?: string;
   createdClient?: boolean;
+  addedMessages?: number;
+  threadTitle?: string;
   extracted?: { role: string; text: string }[];
 };
 
@@ -134,15 +137,37 @@ export async function captureChatScreenshot(
     createdClient = true;
   }
 
-  // One thread per platform keeps histories separate, matching the house rule.
-  const threadTitle = `${CHANNEL_LABELS[platform]} chat`;
-  const { data: threads } = await supabase
+  // Land on the conversation this screenshot continues: the freshest thread on
+  // the same platform. A second thread for one platform would split the story,
+  // so a new one is only created when none exists for that platform.
+  const { data: threadRows } = await supabase
     .from('threads')
-    .select('id')
+    .select('id, title, updated_at')
     .eq('client_id', clientId)
-    .eq('title', threadTitle)
-    .limit(1);
-  let threadId = (threads ?? [])[0]?.id as string | undefined;
+    .order('updated_at', { ascending: false });
+  const threadIds = ((threadRows ?? []) as { id: string }[]).map((row) => row.id);
+
+  const channelByThread = new Map<string, string>();
+  if (threadIds.length > 0) {
+    const { data: channelRows } = await supabase
+      .from('messages')
+      .select('thread_id, channel')
+      .in('thread_id', threadIds)
+      .not('channel', 'is', null)
+      .order('sent_at', { ascending: false });
+    for (const row of (channelRows ?? []) as { thread_id: string; channel: string }[]) {
+      if (!channelByThread.has(row.thread_id)) channelByThread.set(row.thread_id, row.channel);
+    }
+  }
+  const infos = ((threadRows ?? []) as { id: string; title: string }[]).map((row) => ({
+    id: row.id,
+    title: row.title,
+    channel: channelByThread.get(row.id) ?? null,
+  }));
+
+  const picked = pickThread(infos, platform);
+  let threadId: string | undefined = picked?.id;
+  const threadTitle = picked?.title ?? `${CHANNEL_LABELS[platform]} chat`;
   if (!threadId) {
     const { data: createdThread, error } = await supabase
       .from('threads')
@@ -158,9 +183,24 @@ export async function captureChatScreenshot(
     return { ok: false, error: 'I could not open a conversation thread. Try again.' };
   }
 
-  // Save the client's messages, newest last, with the screenshot on the first.
+  // The screenshot usually repeats the last saved lines. Skip anything the
+  // thread already contains so history never doubles, then save the new lines
+  // in order, screenshot attached to the first of them.
+  const { data: existingRows } = await supabase
+    .from('messages')
+    .select('role, content')
+    .eq('thread_id', threadId);
+  const seen = new Set(
+    ((existingRows ?? []) as { role: string; content: string }[]).map((row) =>
+      dedupeKey(row.role, row.content),
+    ),
+  );
+  const fresh = extraction.messages.filter(
+    (message) => !seen.has(dedupeKey(message.role, message.text)),
+  );
+
   let attachmentSaved = false;
-  for (const message of extraction.messages) {
+  for (const message of fresh) {
     const { data: inserted, error } = await supabase
       .from('messages')
       .insert({
@@ -189,6 +229,7 @@ export async function captureChatScreenshot(
       attachmentSaved = true;
     }
   }
+  const addedMessages = fresh.length;
 
   revalidatePath('/clients');
   revalidatePath(`/clients/${clientId}`);
@@ -264,7 +305,9 @@ export async function captureChatScreenshot(
     reply,
     clientId,
     threadId,
+    threadTitle,
     createdClient,
+    addedMessages,
     extracted: extraction.messages.map((m) => ({ role: m.role, text: m.text })),
   };
 }
