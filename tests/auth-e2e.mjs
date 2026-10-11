@@ -322,6 +322,15 @@ async function main() {
     `status ${today.status}`,
   );
 
+  const p4 = todayHtml.indexOf('Phase 4 · Memory engine');
+  const p5 = todayHtml.indexOf('Phase 5 · Research engine');
+  const here = todayHtml.indexOf('you are here');
+  check(
+    'the build status card matches reality: memory engine done, research next',
+    p4 !== -1 && p5 > p4 && here > p5,
+    'the dashboard must never claim an old phase',
+  );
+
   for (const path of ['/clients', '/clients/new', '/search', '/projects', '/settings']) {
     const res = await fetch(`${APP}${path}`, { headers: cookieHeader, redirect: 'manual' });
     check(`owner reaches ${path}`, res.status === 200, `status ${res.status}`);
