@@ -207,7 +207,9 @@ export async function captureChatScreenshot(
   const clientRow = clientResult.client;
 
   const tone = asTone(extraction.tone);
-  const draft = await draftReply({
+  let draft;
+  try {
+    draft = await draftReply({
     channel: platform,
     tone,
     purpose: 'reply',
@@ -238,7 +240,15 @@ export async function captureChatScreenshot(
       incoming: null,
       channel: platform,
     },
-  });
+    });
+  } catch (error) {
+    console.error('[chat] draft failed', error instanceof Error ? error.message : error);
+    return {
+      ok: false,
+      error:
+        'I saved the conversation, but the model is busy right now. Open the client and use the reply panel in a minute.',
+    };
+  }
 
   const reply = draft.text.trim();
   if (!reply) {

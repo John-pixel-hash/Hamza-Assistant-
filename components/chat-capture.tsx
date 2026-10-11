@@ -9,6 +9,10 @@ import { createClient } from '@/lib/supabase/client';
 
 type UploadState = { uploading: boolean; path: string | null; name: string | null; error: string | null };
 
+/**
+ * A chat shaped screen, the way the big assistants do it: the conversation as
+ * bubbles, the reply as your bubble, and one composer bar at the bottom.
+ */
 export function ChatCapture() {
   const [state, formAction, pending] = useActionState(chatCaptureAction, EMPTY_CHAT_STATE);
   const [upload, setUpload] = useState<UploadState>({
@@ -24,6 +28,7 @@ export function ChatCapture() {
     const file = files?.[0];
     if (!file) return;
 
+    setUpload({ uploading: false, path: null, name: null, error: null });
     setUpload({ uploading: true, path: null, name: null, error: null });
 
     const supabase = createClient();
@@ -64,123 +69,158 @@ export function ChatCapture() {
       ? CHANNEL_LABELS[state.platform as Channel] ?? state.platform
       : 'Unknown platform';
 
+  const clientBubbles = state.extracted?.filter((line) => line.role === 'client') ?? [];
+  const myBubbles = state.extracted?.filter((line) => line.role === 'me') ?? [];
+  const hasConversation = state.ok || clientBubbles.length > 0 || Boolean(state.needsName);
+
   return (
-    <div>
+    <div className="flex min-h-[62vh] flex-col justify-end">
+      {!hasConversation && (
+        <p className="mb-4 text-center text-[13px] text-ink-faint">
+          Tap the plus, pick a screenshot of the chat, and send. I read it and
+          answer as a message you can copy.
+        </p>
+      )}
+
+      {hasConversation && (
+        <div className="mb-2 flex flex-wrap items-center gap-2 text-[12px] text-ink-faint">
+          <span className="font-semibold uppercase tracking-wide">{platformLabel}</span>
+          {state.clientName && (
+            <>
+              <span>·</span>
+              <span>{state.clientName}</span>
+            </>
+          )}
+          {state.createdClient && (
+            <span className="rounded-full bg-line px-2 py-0.5 text-[11px] font-semibold">New client</span>
+          )}
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {clientBubbles.map((line, index) => (
+          <div key={`c${index}`} className="flex justify-start">
+            <p className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-bl-md bg-line px-4 py-2.5 text-[14px]">
+              {line.text}
+            </p>
+          </div>
+        ))}
+        {myBubbles.map((line, index) => (
+          <div key={`m${index}`} className="flex justify-end">
+            <p className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-brand px-4 py-2.5 text-[14px] text-white">
+              {line.text}
+            </p>
+          </div>
+        ))}
+
+        {pending && (
+          <div className="flex justify-end">
+            <p className="rounded-2xl rounded-br-md bg-brand/10 px-4 py-2.5 text-[13px] text-ink-faint">
+              Reading and writing...
+            </p>
+          </div>
+        )}
+
+        {state.ok && state.reply && (
+          <div className="flex flex-col items-end">
+            <p className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-brand px-4 py-2.5 text-[14px] text-white">
+              {state.reply}
+            </p>
+            <div className="mt-2 flex flex-wrap justify-end gap-2">
+              <button className="btn btn-quiet btn-small" type="button" onClick={copyReply}>
+                {copied ? 'Copied' : 'Copy'}
+              </button>
+              {state.clientId && (
+                <Link className="btn btn-quiet btn-small" href={`/clients/${state.clientId}`}>
+                  Open client
+                </Link>
+              )}
+              <button
+                className="btn btn-quiet btn-small"
+                type="button"
+                onClick={() => {
+                  setUpload({ uploading: false, path: null, name: null, error: null });
+                  if (fileRef.current) fileRef.current.value = '';
+                }}
+              >
+                New chat
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       <form
         action={async (formData: FormData) => {
           setCopied(false);
           await formAction(formData);
         }}
-        className="card p-4"
+        className="card mt-4 rounded-3xl p-3"
       >
         {state.error && !state.needsName && (
-          <div className="alert alert-error mb-3" role="alert">
+          <div className="alert alert-error mb-2" role="alert">
             {state.error}
           </div>
         )}
-
-        {state.needsName && (
-          <div className="alert alert-error mb-3" role="alert">
-            I read the conversation but the person's name is not visible in the screenshot. Type it
-            once and I will take it from there.
-          </div>
-        )}
-
-        <label className="mb-1 block text-[13px] font-semibold" htmlFor="chat-screenshot">
-          Screenshot of the conversation
-        </label>
-        <input
-          id="chat-screenshot"
-          ref={fileRef}
-          type="file"
-          accept="image/png,image/jpeg,image/webp,image/gif"
-          onChange={(event) => handleFiles(event.target.files)}
-          className="mb-2 block w-full text-[13px]"
-        />
-        {upload.uploading && <p className="mb-2 text-[13px] text-ink-faint">Uploading...</p>}
         {upload.error && (
-          <div className="alert alert-error mb-3" role="alert">
+          <div className="alert alert-error mb-2" role="alert">
             {upload.error}
           </div>
         )}
-        {upload.path && !upload.uploading && (
-          <p className="mb-3 text-[13px] text-ink-faint">Attached: {upload.name}</p>
-        )}
-
         {state.needsName && (
           <label className="mb-2 block text-[13px] font-semibold" htmlFor="chat-client-name">
-            Client name
+            I read the chat but the name is not visible. Who is this?
             <input
               id="chat-client-name"
               name="client_name"
               type="text"
               required
               className="input mt-1"
-              placeholder="Who is this?"
+              placeholder="Client name"
             />
           </label>
         )}
 
+        <div className="flex items-center gap-2">
+          <label
+            className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full border border-line-strong text-ink-faint"
+            htmlFor="chat-screenshot"
+            title="Attach a screenshot"
+          >
+            <svg aria-hidden viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+              <path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z" />
+            </svg>
+          </label>
+          <input
+            id="chat-screenshot"
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            onChange={(event) => handleFiles(event.target.files)}
+            className="sr-only"
+          />
+          <p className="min-w-0 flex-1 truncate text-[13px] text-ink-faint">
+            {upload.uploading
+              ? 'Uploading...'
+              : upload.path
+                ? upload.name
+                : 'Attach a screenshot of the conversation'}
+          </p>
+          <button
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand text-white disabled:opacity-40"
+            type="submit"
+            disabled={pending || upload.uploading || !(upload.path || state.path)}
+            title="Send"
+          >
+            <svg aria-hidden viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+              <path d="M12 4l6 6h-4v10h-4V10H8z" />
+            </svg>
+          </button>
+        </div>
+
         <input type="hidden" name="storage_path" value={upload.path ?? state.path ?? ''} />
         <input type="hidden" name="original_name" value={upload.name ?? 'screenshot'} />
-
-        <button
-          className="btn btn-primary w-full"
-          type="submit"
-          disabled={pending || upload.uploading || !(upload.path || state.path)}
-        >
-          {pending ? 'Reading and writing...' : 'Read it and write my reply'}
-        </button>
       </form>
-
-      {state.ok && state.reply && (
-        <div className="card mt-4 p-4">
-          <div className="mb-2 flex flex-wrap items-center gap-2 text-[12px] text-ink-faint">
-            <span className="font-semibold uppercase tracking-wide">{platformLabel}</span>
-            <span>·</span>
-            <span>{state.clientName}</span>
-            {state.createdClient && (
-              <span className="rounded-full bg-line px-2 py-0.5 text-[11px] font-semibold">New client</span>
-            )}
-          </div>
-
-          <p className="whitespace-pre-wrap text-[14px]">{state.reply}</p>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button className="btn btn-primary" type="button" onClick={copyReply}>
-              {copied ? 'Copied' : 'Copy reply'}
-            </button>
-            {state.clientId && (
-              <Link className="btn btn-quiet" href={`/clients/${state.clientId}`}>
-                Open client
-              </Link>
-            )}
-            <button
-              className="btn btn-quiet"
-              type="button"
-              onClick={() => {
-                setUpload({ uploading: false, path: null, name: null, error: null });
-                if (fileRef.current) fileRef.current.value = '';
-              }}
-            >
-              New screenshot
-            </button>
-          </div>
-
-          {state.extracted && state.extracted.length > 0 && (
-            <details className="mt-4 text-[13px] text-ink-faint">
-              <summary className="cursor-pointer font-semibold">What I read from the screenshot</summary>
-              <ul className="mt-2 space-y-1">
-                {state.extracted.map((line, index) => (
-                  <li key={index}>
-                    <span className="font-semibold">{line.role === 'me' ? 'You' : 'Client'}:</span> {line.text}
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
-        </div>
-      )}
     </div>
   );
 }

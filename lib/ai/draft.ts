@@ -32,12 +32,16 @@ export {
 } from './draft-core';
 export type { DraftOutcome, DraftRequest, GenerateFn } from './draft-core';
 
-/** Walks the AI SDK's nested error shapes looking for a 429 quota refusal. */
+/** Walks the AI SDK's nested error shapes looking for a refusal that the lite
+ * model can take over: quota 429s, and 503 demand spikes on the primary. */
 function isQuotaError(error: unknown, depth = 0): boolean {
   if (!error || typeof error !== 'object' || depth > 4) return false;
   const e = error as Record<string, unknown>;
-  if (e.statusCode === 429) return true;
-  if (typeof e.message === 'string' && /RESOURCE_EXHAUSTED|QuotaFailure/i.test(e.message)) {
+  if (e.statusCode === 429 || e.statusCode === 503) return true;
+  if (
+    typeof e.message === 'string' &&
+    /RESOURCE_EXHAUSTED|QuotaFailure|UNAVAILABLE|high demand/i.test(e.message)
+  ) {
     return true;
   }
   const nested = Array.isArray(e.errors)
