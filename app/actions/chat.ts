@@ -1,11 +1,8 @@
 'use server';
 
-import { captureChatScreenshot, type ChatCaptureResult } from '@/lib/chat/capture';
+import { captureChatScreenshot } from '@/lib/chat/capture';
+import type { ChatState } from '@/lib/chat/state';
 import { revalidatePath } from 'next/cache';
-
-export type ChatState = ChatCaptureResult & { path?: string };
-
-export const EMPTY_CHAT_STATE: ChatState = { ok: false };
 
 /**
  * The whole Chat flow behind one form post: the browser has already uploaded

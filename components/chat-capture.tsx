@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useActionState, useEffect, useRef, useState } from 'react';
 
-import { chatCaptureAction, EMPTY_CHAT_STATE } from '@/app/actions/chat';
+import { chatCaptureAction } from '@/app/actions/chat';
+import { EMPTY_CHAT_STATE } from '@/lib/chat/state';
 import { CHANNEL_LABELS, type Channel } from '@/lib/domain';
 import { createClient } from '@/lib/supabase/client';
 
