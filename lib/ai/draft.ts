@@ -3,7 +3,14 @@ import 'server-only';
 import { generateText, type LanguageModel } from 'ai';
 
 import { getModelFor, modelFor } from './provider';
-import { DRAFT_FALLBACK_MODEL } from './routing';
+import { DRAFT_FALLBACK_MODEL, modelChain, sleepMs } from './routing';
+
+// Drafts share the 60 second serverless window with everything else the
+// action does. New fallback attempts stop once 40 seconds are gone, and each
+// attempt is capped, so the repair pass still fits after a bad spike.
+const DRAFT_BUDGET_MS = 40000;
+const DRAFT_ATTEMPT_TIMEOUT_MS = 14000;
+const DRAFT_BACKOFF_MS = 1500;
 import { logRun } from './telemetry';
 import {
   draftReplyWith,
@@ -58,32 +65,45 @@ export async function draftReply(
   // The capture flow lives inside a 60 second serverless window, so it starts
   // on the fast model. The reply panel keeps the primary voice.
   const startFast = request.fast === true && resolved.modelId !== DRAFT_FALLBACK_MODEL;
-  let usedModel = startFast
-    ? modelFor({ ...resolved, modelId: DRAFT_FALLBACK_MODEL })
-    : model;
+  const firstModelId = startFast ? DRAFT_FALLBACK_MODEL : resolved.modelId;
+  let usedModel = startFast ? modelFor({ ...resolved, modelId: firstModelId }) : model;
   let usedResolved = startFast
-    ? { ...resolved, modelId: DRAFT_FALLBACK_MODEL, reason: 'capture fast path' }
+    ? { ...resolved, modelId: firstModelId, reason: 'capture fast path' }
     : resolved;
   let quotaFallback = false;
-  let outcome: DraftOutcome;
 
-  try {
-    outcome = await draftReplyWith(aiSdkGenerator(model), request);
-  } catch (error) {
-    if (!isQuotaError(error) || resolved.modelId === DRAFT_FALLBACK_MODEL) throw error;
-    // The primary model's free daily allowance is spent. The lite model has
-    // its own, so the draft still gets written, and the telemetry row says
-    // fallback so the switch is visible on the settings page.
-    usedModel = modelFor({ ...resolved, modelId: DRAFT_FALLBACK_MODEL });
-    usedResolved = {
-      ...resolved,
-      modelId: DRAFT_FALLBACK_MODEL,
-      fellBack: true,
-      reason: 'primary model quota exhausted',
-    };
-    quotaFallback = true;
-    outcome = await draftReplyWith(aiSdkGenerator(usedModel), request);
+  // The routed model first, then every other free tier model. Quota is per
+  // model id, so a spike that locks one leaves the others with allowance.
+  // A refusal moves the draft on after a short pause; any other error
+  // rethrows, because retrying a refusal of a different kind wastes seconds.
+  const started = Date.now();
+  let outcome: DraftOutcome | null = null;
+  let lastError: unknown = null;
+
+  for (const [index, modelId] of modelChain(firstModelId).entries()) {
+    if (index > 0) {
+      if (Date.now() - started > DRAFT_BUDGET_MS) break;
+      await sleepMs(DRAFT_BACKOFF_MS);
+      usedModel = modelFor({ ...resolved, modelId });
+      usedResolved = {
+        ...resolved,
+        modelId,
+        fellBack: true,
+        reason: 'quota spike fallback',
+      };
+      quotaFallback = true;
+    }
+    try {
+      outcome = await draftReplyWith(aiSdkGenerator(usedModel, DRAFT_ATTEMPT_TIMEOUT_MS), request);
+      lastError = null;
+      break;
+    } catch (error) {
+      lastError = error;
+      if (!isQuotaError(error)) throw error;
+    }
   }
+
+  if (!outcome) throw lastError;
 
   await logRun({
     task: 'reply_draft',
@@ -113,7 +133,7 @@ export async function draftReply(
 }
 
 /** The real generator, using whichever model the task routes to. */
-export function aiSdkGenerator(model: LanguageModel): GenerateFn {
+export function aiSdkGenerator(model: LanguageModel, timeoutMs = 25000): GenerateFn {
   return async ({ system, prompt, maxOutputTokens }) => {
     const result = await generateText({
       model,
@@ -122,7 +142,7 @@ export function aiSdkGenerator(model: LanguageModel): GenerateFn {
       maxOutputTokens,
       // One shot per model, hard capped. The quota/spike fallback owns
       // retries, because SDK backoff can eat the 60 second serverless budget.
-      abortSignal: AbortSignal.timeout(25000),
+      abortSignal: AbortSignal.timeout(timeoutMs),
     });
     return {
       text: result.text,

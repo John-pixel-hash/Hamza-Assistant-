@@ -1,10 +1,18 @@
 import { generateText } from 'ai';
 
 import { getModelFor, modelFor } from './provider';
+import { modelChain, sleepMs } from './routing';
 import { logRun } from './telemetry';
 
 import { VISION_PROMPT, parseVisionJson } from './vision-core';
 export const VISION_FALLBACK_MODEL = 'gemini-3.1-flash-lite';
+
+// Vision runs inside the capture action together with the draft, in one 60
+// second serverless window. New fallback attempts stop once 30 seconds are
+// gone, so a healthy model always remains reachable for the draft half.
+const VISION_BUDGET_MS = 30000;
+const VISION_ATTEMPT_TIMEOUT_MS = 12000;
+const VISION_BACKOFF_MS = 2000;
 
 export { parseVisionJson } from './vision-core';
 export type { VisionExtraction, VisionMessage, VisionResult } from './vision-core';
@@ -32,18 +40,18 @@ export async function readConversationScreenshot(image: {
   const started = Date.now();
   const { model, resolved } = await getModelFor('vision');
 
-  // Lite first because it is quick, flash second because it is often healthy
-  // when lite spikes. Deduped so an override row never doubles a call.
-  const chain = [resolved.modelId, VISION_FALLBACK_MODEL, 'gemini-3.5-flash'].filter(
-    (modelId, index, list) => list.indexOf(modelId) === index,
-  );
-  const candidates = chain.map((modelId) => ({
+  // The routed model first, then every other free tier model: quota is per
+  // model id, so a spike on one rarely touches the rest. A short pause
+  // between refusals gives a recovering bucket time to open.
+  const candidates = modelChain(resolved.modelId).map((modelId) => ({
     handle: modelId === resolved.modelId ? model : modelFor({ ...resolved, modelId }),
     modelId,
   }));
 
   let lastError: unknown = null;
-  for (const candidate of candidates) {
+  for (const [index, candidate] of candidates.entries()) {
+    if (index > 0 && Date.now() - started > VISION_BUDGET_MS) break;
+    if (index > 0) await sleepMs(VISION_BACKOFF_MS);
     try {
       const answer = await generateText({
         model: candidate.handle,
@@ -59,7 +67,7 @@ export async function readConversationScreenshot(image: {
         maxOutputTokens: 1200,
         // Our own candidate loop owns retries. SDK retries would burn seconds
         // inside a server action that has a hard 60 second budget.
-        abortSignal: AbortSignal.timeout(15000),
+        abortSignal: AbortSignal.timeout(VISION_ATTEMPT_TIMEOUT_MS),
       });
       const extraction = parseVisionJson(answer.text);
       await logRun({

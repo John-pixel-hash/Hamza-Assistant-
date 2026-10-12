@@ -66,6 +66,28 @@ export const ALLOWED_MODELS: Record<string, string[]> = {
  * here. The lite model has its own allowance, so the button keeps working. */
 export const DRAFT_FALLBACK_MODEL = 'gemini-3.1-flash-lite';
 
+/**
+ * Every free tier text and vision model, in the order a fallback chain tries
+ * them. Gemini quota is accounted per model id, so a different id is a
+ * different allowance: when one model spikes or is spent, the next usually is
+ * not. This is what turns "the model is busy" into a silent model switch.
+ */
+export const MODEL_CHAIN = [
+  'gemini-3.1-flash-lite',
+  'gemini-flash-lite-latest',
+  'gemini-3.5-flash',
+];
+
+/** The routed model first, then the rest of the chain, deduped. */
+export function modelChain(primary: string): string[] {
+  return [primary, ...MODEL_CHAIN].filter((id, index, list) => list.indexOf(id) === index);
+}
+
+/** Plain wait, so fallback loops can pause between quota refusals. */
+export function sleepMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export const DEFAULT_ROUTING: Record<AiTask, { provider: string; modelId: string }> = {
   reply_draft: { provider: 'google', modelId: 'gemini-3.5-flash' },
   plan: { provider: 'google', modelId: 'gemini-3.5-flash' },

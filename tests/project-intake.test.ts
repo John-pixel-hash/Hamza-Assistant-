@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { parseIntakePayload, runIntake } from '../lib/ai/intake.ts';
+import { MODEL_CHAIN } from '../lib/ai/routing.ts';
 
 // runIntake reads the key before touching the network. Tests inject every
 // fetch, so a dummy key just opens the door; nothing real is called.
@@ -112,7 +113,7 @@ test('runIntake repairs with the second model when the first answers junk', asyn
   };
   const result = await runIntake({ title: 'Site', brief: 'Client wants a site.', deliverables: [] }, { fetchImpl });
   assert.ok(result.restatement);
-  assert.equal(result.modelId, 'gemini-3.5-flash');
+  assert.equal(result.modelId, MODEL_CHAIN[1], 'the second model in the chain takes over');
   assert.equal(result.repaired, true);
 });
 

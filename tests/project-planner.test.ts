@@ -7,6 +7,7 @@ import {
   parseQueriesPayload,
   runPlanner,
 } from '../lib/ai/planner.ts';
+import { MODEL_CHAIN, modelChain } from '../lib/ai/routing.ts';
 
 // The engines read the key before touching the network. Tests inject every
 // fetch, so a dummy key only opens the door.
@@ -110,8 +111,17 @@ test('runPlanner returns parsed steps and reports repair', async () => {
     { fetchImpl },
   );
   assert.equal(result.steps.length, 2);
-  assert.equal(result.modelId, 'gemini-3.5-flash');
+  assert.equal(result.modelId, MODEL_CHAIN[1], 'the second model in the chain takes over');
   assert.equal(result.repaired, true);
+});
+
+test('modelChain puts the routed model first and never repeats one', () => {
+  assert.deepEqual(modelChain('gemini-3.5-flash'), [
+    'gemini-3.5-flash',
+    'gemini-3.1-flash-lite',
+    'gemini-flash-lite-latest',
+  ]);
+  assert.deepEqual(modelChain(MODEL_CHAIN[0] as string), MODEL_CHAIN);
 });
 
 test('generateResearchQueries and runPlanner report honest failures', async () => {

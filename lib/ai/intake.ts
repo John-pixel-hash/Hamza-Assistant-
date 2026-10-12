@@ -11,6 +11,8 @@
  * REST based, server-only free, never throws. Free tier models only.
  */
 
+import { MODEL_CHAIN } from './routing';
+
 export type BriefRestatement = {
   goal: string;
   deliverables: string[];
@@ -40,7 +42,7 @@ export type IntakeInput = {
   clientName?: string | null;
 };
 
-const INTAKE_MODELS = ['gemini-3.1-flash-lite', 'gemini-3.5-flash'];
+const INTAKE_MODELS = MODEL_CHAIN;
 const MAX_QUESTIONS = 6;
 
 function asStringArray(value: unknown, cap = 8): string[] {

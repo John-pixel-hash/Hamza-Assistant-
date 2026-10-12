@@ -75,7 +75,7 @@ export async function captureChatScreenshot(
       error:
         vision.reason === 'unreadable'
           ? 'I could not read a conversation in that screenshot. Try a clearer capture of the chat.'
-          : 'The vision model is busy right now. Wait a moment and try again.',
+          : 'Every vision model is busy right now. Wait a minute and try again.',
     };
   }
   const extraction = vision.extraction;
@@ -289,7 +289,7 @@ export async function captureChatScreenshot(
     return {
       ok: false,
       error:
-        'I saved the conversation, but the model is busy right now. Open the client and use the reply panel in a minute.',
+        'I saved the conversation, but every model is busy right now. Open the client and use the reply panel in a minute.',
     };
   }
 

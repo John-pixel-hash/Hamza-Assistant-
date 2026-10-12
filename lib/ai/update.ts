@@ -6,7 +6,9 @@
  * REST based, server-only free, never throws, free tier models only.
  */
 
-const UPDATE_MODELS = ['gemini-3.1-flash-lite', 'gemini-3.5-flash'];
+import { MODEL_CHAIN } from './routing';
+
+const UPDATE_MODELS = MODEL_CHAIN;
 
 export type UpdateInput = {
   clientName: string | null;

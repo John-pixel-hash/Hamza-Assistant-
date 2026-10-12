@@ -12,6 +12,8 @@
  *     the checklist it will be judged against.
  */
 
+import { MODEL_CHAIN } from './routing';
+
 export type PlanStepInput = {
   title: string;
   detail: string;
@@ -29,7 +31,7 @@ export type PlanResult = {
   reason?: string;
 };
 
-const PLANNER_MODELS = ['gemini-3.1-flash-lite', 'gemini-3.5-flash'];
+const PLANNER_MODELS = MODEL_CHAIN;
 const MAX_STEPS = 10;
 const MAX_CHECKLIST = 8;
 

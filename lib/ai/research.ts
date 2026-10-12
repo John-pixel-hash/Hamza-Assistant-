@@ -15,6 +15,8 @@
  * REST based, server-only free, never throws.
  */
 
+import { MODEL_CHAIN } from './routing';
+
 export type ResearchSource = { title: string; url: string; snippet?: string };
 
 export type ResearchResult = {
@@ -24,7 +26,7 @@ export type ResearchResult = {
   reason?: string;
 };
 
-const SYNTH_MODELS = ['gemini-3.1-flash-lite', 'gemini-3.5-flash'];
+const SYNTH_MODELS = MODEL_CHAIN;
 const GROUNDING_MODELS = ['gemini-3.5-flash', 'gemini-3.1-flash-lite'];
 
 export type TavilyHit = { title?: string; url?: string; content?: string };
