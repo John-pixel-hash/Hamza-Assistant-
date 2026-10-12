@@ -10,7 +10,7 @@ import path from 'node:path';
 import process from 'node:process';
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL.replace(/\/$/, '');
-const KEY = process.env.SUPABASE_SECRET_KEY;
+const KEY = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
 // The app is single user; the owner id is the fallback so the seed runs with
 // nothing but .env.local.
 const OWNER = process.env.OWNER_USER_ID ?? 'dd7d649d-b19a-4897-b4eb-e7c8d5f6d6bd';
@@ -116,13 +116,40 @@ const headers = {
 let inserted = 0;
 let skipped = 0;
 for (const playbook of PLAYBOOKS) {
-  const check = await fetch(`${URL}/rest/v1/playbooks?slug=eq.${playbook.slug}&select=id`, {
-    headers,
-  });
+  const check = await fetch(
+    `${URL}/rest/v1/playbooks?slug=eq.${playbook.slug}&select=id,content`,
+    { headers },
+  );
   const existing = await check.json();
   if (Array.isArray(existing) && existing.length > 0) {
-    skipped += 1;
-    console.log(`skip  ${playbook.slug}`);
+    // Never overwrite real content: an existing row with text is an owner edit.
+    // An existing row with empty content is an old placeholder; repair it.
+    if ((existing[0].content ?? '').length > 0) {
+      skipped += 1;
+      console.log(`skip  ${playbook.slug}`);
+      continue;
+    }
+    const content = fs.readFileSync(
+      path.join(process.cwd(), 'docs', 'playbooks', playbook.file),
+      'utf8',
+    );
+    const patch = await fetch(`${URL}/rest/v1/playbooks?id=eq.${existing[0].id}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({
+        title: playbook.title,
+        content,
+        trigger_keywords: playbook.trigger_keywords,
+        has_time_sensitive: playbook.has_time_sensitive,
+        active: true,
+      }),
+    });
+    if (!patch.ok) {
+      console.error(`FAIL ${playbook.slug}: ${patch.status} ${await patch.text()}`);
+      process.exit(1);
+    }
+    inserted += 1;
+    console.log(`fill  ${playbook.slug} (empty placeholder repaired)`);
     continue;
   }
 
