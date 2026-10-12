@@ -250,6 +250,7 @@ async function main() {
     '/threads/00000000-0000-0000-0000-000000000000',
     '/search',
     '/projects',
+    '/projects/new',
     '/settings',
   ];
 
@@ -337,10 +338,32 @@ async function main() {
     'the dashboard must never claim an old phase',
   );
 
-  for (const path of ['/clients', '/clients/new', '/chat', '/research', '/search', '/projects', '/settings']) {
+  for (const path of ['/clients', '/clients/new', '/chat', '/research', '/search', '/projects', '/projects/new', '/settings']) {
     const res = await fetch(`${APP}${path}`, { headers: cookieHeader, redirect: 'manual' });
     check(`owner reaches ${path}`, res.status === 200, `status ${res.status}`);
   }
+
+  // Phase 6: project intake. The form is the front door of delivery mode, so
+  // it has to be reachable and honest about what happens on submit.
+  const newProject = await fetch(`${APP}/projects/new`, { headers: cookieHeader, redirect: 'manual' });
+  const newProjectHtml = await newProject.text();
+  check(
+    'the intake form takes the brief in the owner\'s own words',
+    newProject.status === 200 && /the brief, in your words/i.test(newProjectHtml),
+    `status ${newProject.status}`,
+  );
+  check(
+    'the intake form sets expectations: it restates, asks, and sends nothing',
+    /restates the brief/i.test(newProjectHtml) && /nothing is sent to the client/i.test(newProjectHtml),
+    'the form must say what the pass does and that no client message leaves the app',
+  );
+  const projectsHome = await fetch(`${APP}/projects`, { headers: cookieHeader, redirect: 'manual' });
+  const projectsHomeHtml = await projectsHome.text();
+  check(
+    'the projects page offers the intake in one tap',
+    projectsHome.status === 200 && /new project/i.test(projectsHomeHtml),
+    `status ${projectsHome.status}`,
+  );
 
   // Production hardening. Both of these only matter once the app sits behind a
   // real domain and a CDN, which is how it will be deployed, so they are checked

@@ -74,3 +74,136 @@ export async function getProjects(): Promise<{ projects: ProjectListItem[]; read
 
   return { projects: (data ?? []) as unknown as ProjectListItem[], ready: true };
 }
+
+export type ProjectQuestion = {
+  id: string;
+  question: string;
+  why_it_matters: string;
+  status: 'open' | 'sent' | 'answered' | 'dismissed';
+  answer: string | null;
+};
+
+export type ProjectStep = {
+  id: string;
+  position: number;
+  title: string;
+  detail: string | null;
+  method: string | null;
+  method_source: string | null;
+  estimate_minutes: number | null;
+  status: 'not_started' | 'in_progress' | 'blocked' | 'review' | 'done';
+  blocked_reason: string | null;
+  quality_checklist: string[];
+};
+
+export type ResearchNote = {
+  id: string;
+  query: string;
+  summary: string;
+  sources: { url: string; title?: string }[];
+  created_at: string;
+};
+
+export type ProjectDetail = {
+  id: string;
+  title: string;
+  status: string;
+  brief: string | null;
+  brief_json: {
+    goal?: string;
+    deliverables?: string[];
+    constraints?: string[];
+    success?: string[];
+    next_step?: string;
+    deadline_risk?: string | null;
+  } | null;
+  deliverables: string[];
+  deadline: string | null;
+  budget_amount: number | null;
+  currency: string | null;
+  client: { id: string; name: string } | null;
+  questions: ProjectQuestion[];
+  steps: ProjectStep[];
+  research: ResearchNote[];
+};
+
+/**
+ * Everything the project page renders, in one round trip where possible.
+ * The research note query tolerates a missing project_id column so the page
+ * keeps working on a database where migration 0007 has not run yet.
+ */
+export async function getProject(id: string): Promise<ProjectDetail | null> {
+  if (!SUPABASE_CONFIGURED) return null;
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
+
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('projects')
+    .select(
+      'id, title, status, brief, brief_json, deliverables, deadline, budget_amount, currency, ' +
+        'clients(id, name), ' +
+        'questions:project_questions(id, question, why_it_matters, status, answer), ' +
+        'steps:project_steps(id, position, title, detail, method, method_source, estimate_minutes, status, blocked_reason, quality_checklist)',
+    )
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error || !data) return null;
+
+  const row = data as unknown as {
+    id: string;
+    title: string;
+    status: string;
+    brief: string | null;
+    brief_json: ProjectDetail['brief_json'];
+    deliverables: string[] | null;
+    deadline: string | null;
+    budget_amount: number | null;
+    currency: string | null;
+    clients: { id: string; name: string } | null;
+    questions: ProjectQuestion[] | null;
+    steps: (Omit<ProjectStep, 'quality_checklist'> & { quality_checklist: unknown })[] | null;
+  };
+
+  const steps: ProjectStep[] = (row.steps ?? [])
+    .map((step) => ({
+      ...step,
+      quality_checklist: Array.isArray(step.quality_checklist)
+        ? (step.quality_checklist.filter((item): item is string => typeof item === 'string'))
+        : [],
+    }))
+    .sort((a, b) => a.position - b.position);
+
+  // Tolerated failure: before migration 0007 the column does not exist and
+  // this query errors. The rest of the page must still render.
+  let research: ResearchNote[] = [];
+  const researchQuery = await supabase
+    .from('research_notes')
+    .select('id, query, summary, sources, created_at')
+    .eq('project_id', id)
+    .order('created_at', { ascending: false })
+    .limit(10);
+  if (!researchQuery.error && researchQuery.data) {
+    research = (researchQuery.data as unknown as ResearchNote[]).map((note) => ({
+      ...note,
+      sources: Array.isArray(note.sources) ? note.sources.slice(0, 6) : [],
+    }));
+  }
+
+  return {
+    id: row.id,
+    title: row.title,
+    status: row.status,
+    brief: row.brief,
+    brief_json: row.brief_json,
+    deliverables: row.deliverables ?? [],
+    deadline: row.deadline,
+    budget_amount: row.budget_amount,
+    currency: row.currency,
+    client: row.clients ?? null,
+    questions: (row.questions ?? []) as ProjectQuestion[],
+    steps,
+    research,
+  };
+}
