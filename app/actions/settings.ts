@@ -22,9 +22,13 @@ export async function saveTavilyKeyAction(
   } = await supabase.auth.getUser();
   if (!user) return { error: 'You are signed out. Sign in and try again.' };
 
+  // The field renders blank even when a key is stored, so an empty submit is a
+  // no-op. Writing null here would silently delete the working key.
+  if (!value) return { error: null };
+
   const { error } = await supabase.from('user_secrets').upsert({
     user_id: user.id,
-    tavily_key: value || null,
+    tavily_key: value,
     updated_at: new Date().toISOString(),
   });
   if (error) {

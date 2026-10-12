@@ -85,5 +85,11 @@ the top of the content (bumps the version too).
   parsing, verified-note stripping, stale marker in block. 153 tests pass.
 - Harness 82/82 including: /knowledge rejects anonymous and non-owner, owner sees the
   empty state on a fresh database.
-- Live: seeded into production, owner loads /knowledge and sees all nine playbooks with
-  badges; refresh on a seeded playbook writes a dated verified note.
+- Live: all nine playbooks seeded into production (old empty placeholder rows from the
+  initial setup were repaired in place, never overwritten if they held content) and the
+  owner's /knowledge page renders them with correct badges.
+- Live gap: the Refresh flow was exercised in production and correctly reached the
+  search step, but returned no sources because the stored Tavily key was null. Cause
+  found and fixed: saving the Settings research card with an empty field used to write
+  null over a stored key. The fix makes an empty save a no-op. Refresh stays unverified
+  end to end until a Tavily key is saved again in Settings.
