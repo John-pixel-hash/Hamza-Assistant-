@@ -88,8 +88,9 @@ the top of the content (bumps the version too).
 - Live: all nine playbooks seeded into production (old empty placeholder rows from the
   initial setup were repaired in place, never overwritten if they held content) and the
   owner's /knowledge page renders them with correct badges.
-- Live gap: the Refresh flow was exercised in production and correctly reached the
-  search step, but returned no sources because the stored Tavily key was null. Cause
-  found and fixed: saving the Settings research card with an empty field used to write
-  null over a stored key. The fix makes an empty save a no-op. Refresh stays unverified
-  end to end until a Tavily key is saved again in Settings.
+- Live: the Refresh flow was proven end to end on 2026-10-12. Refreshing the Meta ads
+  playbook ran its two research queries, wrote a dated "## Verified" note with answers
+  and sources at the top of the content, bumped it to v2, and set last_researched_at.
+  Along the way a real bug was found and fixed: saving the Settings research card with
+  an empty field used to write null over a stored Tavily key. An empty save is now a
+  no-op.
