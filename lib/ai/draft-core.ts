@@ -37,6 +37,8 @@ export type DraftRequest = {
   /** Start on the fast model: used by flows inside the serverless time box. */
   fast?: boolean;
   channel?: string;
+  /** Operating knowledge matched to this request, loaded by the caller. */
+  knowledge?: string;
 };
 
 /**
@@ -135,6 +137,7 @@ export async function draftReplyWith(
     tone: request.tone ?? 'unknown',
     stage: request.context.client.stage ?? 'lead',
     purpose: request.purpose ?? 'reply',
+    knowledge: request.knowledge,
   });
 
   const basePrompt = [

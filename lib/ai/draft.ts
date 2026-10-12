@@ -2,6 +2,8 @@ import 'server-only';
 
 import { generateText, type LanguageModel } from 'ai';
 
+import { buildKnowledgeBlock } from './knowledge';
+import { getActivePlaybooks } from '../data/knowledge';
 import { getModelFor, modelFor } from './provider';
 import { DRAFT_FALLBACK_MODEL, modelChain, sleepMs } from './routing';
 
@@ -61,6 +63,23 @@ export async function draftReply(
   request: DraftRequest,
 ): Promise<DraftOutcome & { modelId: string }> {
   const { model, resolved } = await getModelFor('reply_draft');
+
+  // Operating knowledge rides along when a playbook matches the request.
+  // Failures here must never cost the draft: empty block means no knowledge.
+  let knowledge = '';
+  try {
+    const playbooks = await getActivePlaybooks();
+    const lastClient = [...request.context.messages]
+      .reverse()
+      .find((message) => message.role === 'client')?.content;
+    knowledge = buildKnowledgeBlock(
+      [request.context.incoming ?? '', lastClient ?? '', request.context.thread.title ?? ''].join(' '),
+      playbooks,
+    );
+  } catch (error) {
+    console.error('[draft] knowledge load failed', error instanceof Error ? error.message : error);
+  }
+  request = { ...request, knowledge };
 
   // The capture flow lives inside a 60 second serverless window, so it starts
   // on the fast model. The reply panel keeps the primary voice.

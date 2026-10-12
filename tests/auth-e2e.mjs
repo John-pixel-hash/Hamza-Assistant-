@@ -251,6 +251,7 @@ async function main() {
     '/search',
     '/projects',
     '/projects/new',
+    '/knowledge',
     '/settings',
   ];
 
@@ -338,7 +339,7 @@ async function main() {
     'the dashboard must never claim an old phase',
   );
 
-  for (const path of ['/clients', '/clients/new', '/chat', '/research', '/search', '/projects', '/projects/new', '/settings']) {
+  for (const path of ['/clients', '/clients/new', '/chat', '/research', '/search', '/projects', '/projects/new', '/knowledge', '/settings']) {
     const res = await fetch(`${APP}${path}`, { headers: cookieHeader, redirect: 'manual' });
     check(`owner reaches ${path}`, res.status === 200, `status ${res.status}`);
   }
@@ -410,6 +411,21 @@ async function main() {
       redirect: 'manual',
     })).status === 404,
     'no stack traces, no half pages',
+  );
+
+  // Phase 7: the knowledge library. Empty in preview mode, but the page must
+  // be the owner's library, reachable and honest about its state.
+  const knowledge = await fetch(`${APP}/knowledge`, { headers: cookieHeader, redirect: 'manual' });
+  const knowledgeHtml = await knowledge.text();
+  check(
+    'the knowledge page is the playbook library',
+    knowledge.status === 200 && /playbooks/i.test(knowledgeHtml) && /no playbooks yet/i.test(knowledgeHtml),
+    `status ${knowledge.status}`,
+  );
+  check(
+    'the dashboard carries the knowledge entry point',
+    todayHtml.includes('Knowledge'),
+    'one tap from Today, like Chat and Research',
   );
 
   // Production hardening. Both of these only matter once the app sits behind a

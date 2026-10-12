@@ -40,6 +40,8 @@ export type IntakeInput = {
   budget?: string | null;
   currency?: string | null;
   clientName?: string | null;
+  /** Operating knowledge matched to this brief, when any playbook matched. */
+  knowledge?: string;
 };
 
 const INTAKE_MODELS = MODEL_CHAIN;
@@ -168,6 +170,9 @@ function buildIntakePrompt(input: IntakeInput): string {
     'Raw brief from the freelancer:',
     input.brief.slice(0, 4000),
   ];
+  if (input.knowledge) {
+    lines.push('', '## Operating knowledge for this domain', '', input.knowledge);
+  }
   return lines.join('\n');
 }
 

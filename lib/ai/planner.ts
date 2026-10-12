@@ -181,6 +181,8 @@ export type PlannerInput = {
   answers: { question: string; answer: string }[];
   openQuestions: string[];
   research: { query: string; summary: string; urls: string[] }[];
+  /** Operating knowledge matched to this project, when any playbook matched. */
+  knowledge?: string;
 };
 
 export async function runPlanner(
@@ -199,7 +201,7 @@ export async function runPlanner(
     })
     .join('\n\n');
 
-  const prompt = [
+  let prompt = [
     'You are the delivery lead inside a private assistant for a freelance web',
     'designer and digital marketer. Write the step plan for one project.',
     'The plan is built ONLY from the brief, the client\'s answers, and the',
@@ -246,6 +248,10 @@ export async function runPlanner(
     'Research:',
     researchBlocks || 'none, so methods are the freelancer\'s standard and say so',
   ].join('\n');
+
+  if (input.knowledge) {
+    prompt = [prompt, '## Operating knowledge for this domain', '', input.knowledge].join('\n');
+  }
 
   let attempts = 0;
   for (const modelId of PLANNER_MODELS) {

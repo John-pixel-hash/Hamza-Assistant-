@@ -3,8 +3,10 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
+import { buildKnowledgeBlock } from '@/lib/ai/knowledge';
 import { runIntake } from '@/lib/ai/intake';
 import { generateResearchQueries, runPlanner } from '@/lib/ai/planner';
+import { getActivePlaybooks } from '@/lib/data/knowledge';
 import { researchQuestion } from '@/lib/ai/research';
 import { draftProjectUpdate } from '@/lib/ai/update';
 import { normaliseChecklist } from '@/lib/data/projects';
@@ -92,6 +94,15 @@ export async function createProjectAction(
 
   // The AI pass refines; it never gates. Whatever it returns lands on the
   // project, and a failure leaves the raw brief intact with an honest note.
+  let knowledge = '';
+  try {
+    knowledge = buildKnowledgeBlock(
+      `${title} ${brief} ${deliverables.join(' ')}`,
+      await getActivePlaybooks(),
+    );
+  } catch {
+    // Knowledge is a bonus, never a gate.
+  }
   const intake = await runIntake({
     title,
     brief,
@@ -100,6 +111,7 @@ export async function createProjectAction(
     budget: budget || null,
     currency,
     clientName,
+    knowledge,
   });
 
   if (intake.restatement) {
@@ -319,6 +331,15 @@ export async function planProjectAction(
 
   const briefJson = (row.brief_json ?? {}) as { goal?: string | null };
   const questions = row.questions ?? [];
+  let knowledge = '';
+  try {
+    knowledge = buildKnowledgeBlock(
+      `${row.title} ${briefJson.goal ?? ''} ${((row.deliverables ?? []) as string[]).join(' ')}`,
+      await getActivePlaybooks(),
+    );
+  } catch {
+    // Knowledge is a bonus, never a gate.
+  }
   const plan = await runPlanner({
     title: row.title,
     goal: briefJson.goal ?? null,
@@ -338,6 +359,7 @@ export async function planProjectAction(
         .filter((u): u is string => u.startsWith('http'))
         .slice(0, 6),
     })),
+    knowledge,
   });
 
   if (plan.steps.length === 0) {

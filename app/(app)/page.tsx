@@ -45,6 +45,9 @@ export default async function TodayPage() {
           <Link className="btn btn-quiet" href="/research">
             Research
           </Link>
+          <Link className="btn btn-quiet" href="/knowledge">
+            Knowledge
+          </Link>
           <Link className="btn btn-primary btn-small shrink-0" href="/clients/new">
             Add client
           </Link>
@@ -180,8 +183,8 @@ const BUILD_STEPS: { label: string; done: boolean; current?: boolean }[] = [
   { label: 'Phase 3 · AI core: model switching, guardrails, telemetry', done: true },
   { label: 'Phase 4 · Memory engine: facts, summaries, semantic recall', done: true },
   { label: 'Phase 5 · Research engine: sourced answers, no guessing', done: true },
-  { label: 'Phase 6 · Project delivery mode', done: false, current: true },
-  { label: 'Phase 7 · The nine domain playbooks', done: false },
+  { label: 'Phase 6 · Project delivery mode', done: true },
+  { label: 'Phase 7 · The nine domain playbooks', done: false, current: true },
   { label: 'Phase 8 · Hardening, cost dashboard, documentation', done: false },
 ];
 

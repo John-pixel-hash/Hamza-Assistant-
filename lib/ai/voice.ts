@@ -96,6 +96,8 @@ export type VoiceOptions = {
   stage?: Stage | string;
   /** What the assistant is being asked to do. */
   purpose?: 'reply' | 'next_step' | 'plan' | 'question';
+  /** Operating knowledge loaded because it matched this request. */
+  knowledge?: string;
 };
 
 /**
@@ -111,6 +113,7 @@ export function buildVoicePrompt(options: VoiceOptions = {}): string {
     tone = 'unknown',
     stage = 'lead',
     purpose = 'reply',
+    knowledge = '',
   } = options;
 
   const examples = gold.examples
@@ -191,6 +194,10 @@ export function buildVoicePrompt(options: VoiceOptions = {}): string {
       `- Where they are: ${STAGE_RULES[String(stage)] ?? STAGE_RULES.lead}`,
     ].join('\n'),
   );
+
+  if (knowledge) {
+    parts.push(['## Operating knowledge for this request', '', knowledge].join('\n'));
+  }
 
   if (purpose === 'next_step') {
     parts.push(
