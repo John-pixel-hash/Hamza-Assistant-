@@ -448,6 +448,40 @@ async function main() {
     /Can you do 150\?/.test(threadHtml),
     'the thread history must render for the drafting context to be visible',
   );
+  // Bubble treatment: the saved history reads like the chat screen, so the
+  // two sides have to be distinguishable in the markup, and the composer is
+  // the same bar as on the chat page, sitting under the conversation.
+  // The panel quotes the last client line above the history, so the bubble
+  // checks anchor on the history section itself, not the first match.
+  const historyAt = threadHtml.indexOf('Thread history');
+  const clientBubbleAt = threadHtml.indexOf('items-start', historyAt);
+  check(
+    'the client\'s message renders in a left-hand bubble',
+    historyAt > -1 &&
+      clientBubbleAt > historyAt &&
+      threadHtml.includes('rounded-bl-md') &&
+      threadHtml.indexOf('Can you do 150?', clientBubbleAt) > -1,
+    'incoming messages sit on the left in grey, like the chat screen',
+  );
+  const meBubbleAt = threadHtml.indexOf('items-end', historyAt);
+  check(
+    'what he sent renders as a right-hand blue bubble',
+    meBubbleAt > historyAt &&
+      threadHtml.includes('bg-brand') &&
+      threadHtml.indexOf('The store build is 199.99', meBubbleAt) > -1,
+    'his own messages sit on the right in blue, like the chat screen',
+  );
+  check(
+    'the thread composer is the chat-style bar',
+    threadHtml.includes('Attach screenshot') &&
+      threadHtml.includes('Add a message to this thread'),
+    'one bar with attach, text and send, not the old card form',
+  );
+  check(
+    'the composer bar sits under the conversation',
+    threadHtml.indexOf('Thread history') < threadHtml.indexOf('Attach screenshot'),
+    'the history scrolls above, the bar waits at the bottom',
+  );
 
   const missingThread = await fetch(`${APP}/threads/00000000-0000-0000-0000-000000000000`, {
     headers: cookieHeader,

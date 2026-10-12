@@ -3,9 +3,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { MessageComposer } from '@/components/message-composer';
 import { ReplyPanel } from '@/components/reply-panel';
-import { RoleTag } from '@/components/ui';
 import { getThread } from '@/lib/data/threads';
-import { CHANNEL_LABELS, ROLE_LABELS, STAGE_LABELS } from '@/lib/domain';
+import { CHANNEL_LABELS, STAGE_LABELS } from '@/lib/domain';
 
 export const metadata: Metadata = { title: 'Thread' };
 export const dynamic = 'force-dynamic';
@@ -82,7 +81,10 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
         threadId={thread.id}
       />
 
-      <section className="mt-5 space-y-3">
+      {/* The history reads like the chat screen: the client on the left in
+          grey, what you sent on the right in blue, your private notes in
+          gold. The side and the colour say who spoke, so no role tags. */}
+      <section className="mt-5 space-y-3" aria-label="Thread history">
         {messages.length === 0 ? (
           <div className="card p-5">
             <p className="font-medium">Empty thread</p>
@@ -93,31 +95,36 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
         ) : (
           messages.map((message) => {
             const files = attachmentsByMessage.get(message.id) ?? [];
+            const isNote = message.role === 'note';
+            const onLeft = message.role === 'client' || isNote;
+            const bubble = isNote
+              ? 'rounded-2xl rounded-bl-md border border-dashed border-gold-line bg-gold-soft text-ink'
+              : onLeft
+                ? 'rounded-2xl rounded-bl-md bg-line text-ink'
+                : 'rounded-2xl rounded-br-md bg-brand text-white';
+            const channelLabel = message.channel
+              ? (CHANNEL_LABELS[message.channel as keyof typeof CHANNEL_LABELS] ?? message.channel)
+              : null;
+
             return (
-              <article
+              <div
                 key={message.id}
-                className={`rounded-[14px] p-4 ${
-                  message.role === 'client'
-                    ? 'bubble-client'
-                    : message.role === 'note'
-                      ? 'bubble-note'
-                      : 'bubble-me'
-                }`}
+                className={`flex flex-col ${onLeft ? 'items-start' : 'items-end'}`}
               >
-                <div className="mb-2 flex flex-wrap items-center gap-2 text-[12px] text-ink-faint">
-                  <RoleTag role={message.role} label={ROLE_LABELS[message.role] ?? message.role} />
-                  <span>{formatWhen(message.sent_at ?? message.sent_at ?? new Date().toISOString())}</span>
-                  {message.channel && (
-                    <span>{CHANNEL_LABELS[message.channel as keyof typeof CHANNEL_LABELS] ?? message.channel}</span>
-                  )}
+                {isNote && (
+                  <span className="mb-0.5 px-1 text-[11px] font-semibold uppercase tracking-wide text-gold">
+                    Note
+                  </span>
+                )}
+
+                <div className={`max-w-[85%] px-4 py-2.5 ${bubble}`}>
+                  <p className="whitespace-pre-wrap break-words text-[14px]">{message.content}</p>
                 </div>
 
-                <p className="whitespace-pre-wrap break-words text-[14px]">{message.content}</p>
-
                 {files.length > 0 && (
-                  <ul className="mt-3 space-y-2">
+                  <ul className="mt-1.5 max-w-[85%] space-y-2">
                     {files.map((file) => (
-                      <li key={file.id} className="rounded-lg border border-line bg-surface p-2">
+                      <li key={file.id} className="rounded-xl border border-line bg-surface p-2">
                         {file.kind === 'image' && file.url ? (
                           // Signed URLs expire, so the image is fetched fresh each view.
                           // eslint-disable-next-line @next/next/no-img-element
@@ -147,15 +154,18 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
                     ))}
                   </ul>
                 )}
-              </article>
+
+                <span className="mt-0.5 px-1 text-[11px] text-ink-faint">
+                  {formatWhen(message.sent_at ?? new Date().toISOString())}
+                  {channelLabel ? ` · ${channelLabel}` : ''}
+                </span>
+              </div>
             );
           })
         )}
       </section>
 
-      <section className="mt-5">
-        <MessageComposer threadId={thread.id} clientId={thread.client_id} defaultRole="client" />
-      </section>
+      <MessageComposer threadId={thread.id} clientId={thread.client_id} defaultRole="client" />
     </>
   );
 }

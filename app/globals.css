@@ -220,23 +220,6 @@ textarea.field {
   color: var(--color-brand-ink);
 }
 
-/* Message bubbles in a client thread */
-.bubble-client {
-  background: var(--color-brand-soft);
-  border: 1px solid #d8e3fc;
-  color: var(--color-ink);
-}
-
-.bubble-me {
-  background: var(--color-surface);
-  border: 1px solid var(--color-line);
-}
-
-.bubble-note {
-  background: var(--color-gold-soft);
-  border: 1px dashed var(--color-gold-line);
-}
-
 mark {
   background: var(--color-gold-soft);
   color: var(--color-ink);

@@ -59,3 +59,26 @@ went through the whole chain: platform instagram, name read from the header,
 both messages extracted word for word, client and thread created, facts and
 relationship summary written, both messages embedded, and a reply that quoted
 the budget back. Test rows were deleted afterwards.
+
+## Saved thread pages read like a chat (2026-10-12)
+
+Every thread page renders its history as bubbles, the same visual language as
+the Chat screen: what the client sent sits on the left in grey, what you sent
+sits on the right in blue, and your private notes sit on the left in gold with
+a dashed edge so they can never be mistaken for something the client saw.
+
+The side and the colour say who spoke, so the role tags are gone. Each bubble
+carries its date and platform underneath it, in small type. Screenshots stay
+attached to the message they belong to.
+
+The composer at the bottom is now the same bar as on the Chat screen: round
+attach, text, round send. The role chips (Client, You, Note) sit above it,
+with the platform picker next to them. What it submits is unchanged, so the
+data written is identical to the old card form.
+
+The Write a reply panel stays above the history, as before, because the draft
+is the point of opening a thread.
+
+Four harness checks now hold this in place: client messages render left, sent
+messages render right, the bar is the chat style bar, and the bar sits under
+the conversation.
