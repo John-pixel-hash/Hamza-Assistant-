@@ -1,80 +1,100 @@
 # 17. Project Delivery Mode
 
-Phase 6. The delivery half of the assistant: projects planned and tracked to a
-professional standard, where nothing is assumed and nothing is advised without
-research.
+Phase 6, complete. The delivery half of the assistant: projects planned and
+tracked to a professional standard, where nothing is assumed and nothing is
+advised without research.
 
-The rule the whole mode is built on: missing information becomes a question,
-never a silent guess. And when the deadline does not fit the scope, the
-assistant says so plainly instead of agreeing politely and failing later.
+The rules the whole mode is built on: missing information becomes a question,
+never a silent guess. Method advice is researched before it is given. The
+deadline that does not fit the scope is flagged plainly instead of agreed to
+politely. And nothing is marked done until its quality checklist passes.
 
-## What is live now
-
-### Intake (step 1)
+## The flow
 
 Projects tab, New project button, one screen. Paste the brief in your own
 words, link the client if there is one, add deliverables, deadline and budget
-if known. On submit:
+if known. The project saves first, so a slow AI pass can never lose the brief.
 
-1. The project row is saved first. A slow or failed AI pass can never lose
-   the brief.
-2. The intake engine (flash lite, flash as repair) restates the brief into
-   goal, deliverables, constraints, success criteria and the single next
-   step.
-3. If the deadline does not fit the scope, it says why in a deadline risk
-   warning at the top of the project page.
+### 1. Intake and gap questions
 
-### Gap questions (step 2)
+The intake engine (flash lite, flash as repair, one call) restates the brief
+into goal, deliverables, constraints, success criteria and the single next
+step, and writes three to six gap questions, most important first, each with
+why it matters. They target the gaps that change the plan: who writes the
+copy, who owns hosting and domain access, revisions, what happens when the
+client delays content, tracking, the real pressure behind the deadline.
 
-The same pass writes three to six questions, most important first, each with
-why it matters. They target the gaps that actually change the plan: who
-writes the copy, who owns hosting and domain access, how many revisions, what
-happens if the client delays content, is tracking configured, what is the
-real pressure behind the deadline.
+If the deadline does not fit the scope, a deadline risk warning sits at the
+top of the project page.
 
 Question lifecycle: open, sent, answered, dismissed. Copy sends the wording
-to the client as is. Recording an answer feeds the planner later. The page
-counts what is still open, because the plan is built from answers, not
-assumptions.
+to the client as is. Answers feed the planner; open questions become listed
+assumptions in the plan, visible, never hidden.
 
-## What comes next in this phase
+### 2. Research the method
 
-- Research wiring: the method is researched through the live Tavily engine
-  before any plan is written, and the notes attach to the project
-  (migration 0007 adds the link column).
-- The step planner: ordered steps with method, the research behind it, time
-  estimates and a quality checklist per step. Steps must be executable,
-  never vague.
-- Tracking: steps move through not started, in progress, review, done, or
-  blocked with a named reason. Done is refused until the checklist passes.
-- The client status update draft, in your voice, from real progress.
+One tap derives at most two search questions about the how (tools, prices,
+pitfalls) and runs them through the live research engine. Notes attach to the
+project through the project_id column added by migration 0007, with sources
+and a summary. Partial saves on purpose: whatever completed before a slow
+network is kept. A tighter synth timeout keeps the whole tap inside the
+60 second serverless budget.
+
+### 3. Build the plan
+
+Refused without research. The planner (flash lite, flash as repair) writes
+three to ten ordered steps from brief plus answers plus research. Each step
+carries detail specific enough to execute, a method, the research url behind
+that method (it may only cite urls the research returned), an honest estimate
+in minutes, and a two to six item quality checklist. Open questions become a
+visible assumptions list on the plan.
+
+### 4. Track
+
+Steps move not started, in progress, review, done, or blocked with a named
+blocker. Done is refused server side while any checklist item is unchecked.
+Checklists lock once the step is done. The project status follows the steps:
+planned, active once work starts, delivered once every step passes, so the
+dashboard never lies.
+
+### 5. Client update
+
+Written from the tracker only: what is done, what is in flight, what is
+blocked and why, and the one thing the client needs to do next. Editable
+before copying, in his voice, no invented progress.
 
 ## Design notes
 
-- One model call for intake plus questions, inside the 60 second serverless
-  budget. The engine verifies live at about 15 seconds on flash lite.
-- Free tier models only, like everywhere else.
-- The plan section on the project page tells the truth about its state:
-  while questions are open it points at them, and until the planner ships it
-  says so rather than faking a button.
-- Migration 0007 only adds a nullable project id to research notes, so the
-  app runs fine before it is applied. The research query tolerates the
-  missing column.
+- Every AI pass is one model call chain, inside the 60 second budget, free
+  tier models only.
+- Research notes query tolerates a database without migration 0007, so the
+  page renders before it runs.
+- The plan section tells the truth about its state at every stage.
+- The intake and planner parsers are pure and unit tested; the harness walks
+  a fixture project through the whole tracker screen.
 
 ## Verified live on 2026-10-12
 
-A deliberately vague brief (beauty salon site, no pages listed, no budget,
-"needs it this month") went through the whole intake on production: project
-created, brief restated, deadline risk flagged unprompted, four sharp
-questions with reasons, plan section honest. Question lifecycle checked on
-the same project: mark sent worked, recording an answer updated the chip and
-the counter. Test project deleted afterwards.
+One real project ran end to end through the system on production, on a
+deliberately vague brief (gym landing page, logo only, ten days, around 200
+dollars):
 
-The intake engine itself is verified against the real model with
-scripts/verify-intake.mjs: restatement, deadline risk on a too small budget,
-four questions, no dashes, 15.5 seconds on flash lite.
+- Intake restated the brief and flagged the ten day turnaround as tight
+  before any planning.
+- Research saved two notes with sources; during a Gemini quota spike the
+  synthesis honestly fell back to the raw sources instead of guessing.
+- The plan arrived as six steps with checklists and estimates.
+- Marking a step done before its checklist was refused with a plain reason;
+  after ticking the checks, done went through.
+- A second step was blocked with a named reason, shown on the page, then
+  unblocked.
+- The client update draft quoted the real done step and the real blocker,
+  nothing invented.
 
-Harness checks: intake form reachable and honest, projects page offers it in
-one tap, both pages closed to signed out visitors. Unit tests cover the
-payload parser: goal required, junk questions dropped, duplicates removed,
-cap of six, deadline risk carried through, model repair path.
+Test projects and their notes were deleted afterwards. The intake engine and
+the planner parsers are also verified directly against the models with
+scripts/verify-intake.mjs and the unit suite.
+
+Harness: 78 checks, including the fixture project page asserting the
+checklist gates, the visible assumptions, the research riding with the plan,
+and the update drafted from the tracker.
