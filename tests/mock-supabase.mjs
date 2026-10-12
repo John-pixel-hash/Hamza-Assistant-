@@ -102,6 +102,77 @@ export const FIXTURE = {
       created_at: '2026-10-02T10:00:00Z',
     },
   ],
+  projectId: '55555555-5555-4555-8555-555555555555',
+  project: {
+    id: '55555555-5555-4555-8555-555555555555',
+    title: 'Simon, store rebuild',
+    status: 'active',
+    brief: 'Simon wants the store rebuilt before the sale.',
+    brief_json: {
+      goal: 'Rebuild the store so it converts before the sale',
+      deliverables: ['Store rebuild'],
+      constraints: ['Sale date fixed'],
+      success: ['Checkout works end to end'],
+      next_step: 'Confirm the product list',
+      deadline_risk: null,
+      planning_assumptions: ['Simon provides product photos by Friday'],
+    },
+    deliverables: ['Store rebuild'],
+    deadline: '2026-10-30',
+    budget_amount: 25000,
+    currency: 'USD',
+    clients: { id: '11111111-1111-4111-8111-111111111111', name: 'Simon' },
+    questions: [
+      {
+        id: '66666666-6666-4666-8666-666666666666',
+        question: 'Who writes the product descriptions?',
+        why_it_matters: 'Copy delays are the top cause of late stores.',
+        status: 'answered',
+        answer: 'Simon does, by Friday.',
+      },
+    ],
+    steps: [
+      {
+        id: '77777777-7777-4777-8777-777777777777',
+        position: 1,
+        title: 'Confirm the product list with Simon',
+        detail: 'Agree the exact list and who supplies each photo.',
+        method: 'Standard discovery call',
+        method_source: null,
+        estimate_minutes: 60,
+        status: 'done',
+        blocked_reason: null,
+        quality_checklist: [
+          { item: 'List agreed in writing', done: true },
+          { item: 'Photo owner named per product', done: true },
+        ],
+      },
+      {
+        id: '88888888-8888-4888-8888-888888888888',
+        position: 2,
+        title: 'Install the pixel and test one purchase event end to end',
+        detail: 'Fire a test purchase and see it land in the dashboard.',
+        method: 'Per the platform tracking guide',
+        method_source: 'https://research.example/tracking',
+        estimate_minutes: 90,
+        status: 'in_progress',
+        blocked_reason: null,
+        quality_checklist: [
+          { item: 'Test purchase event fires', done: false },
+          { item: 'Event visible in the dashboard', done: false },
+        ],
+      },
+    ],
+  },
+  researchNotes: [
+    {
+      id: '99999999-9999-4999-8999-999999999999',
+      query: 'store tracking setup pitfalls',
+      summary: 'Test purchases must be verified in the dashboard.',
+      sources: [{ url: 'https://research.example/tracking', title: 'Tracking guide' }],
+      created_at: '2026-10-05T10:00:00Z',
+    },
+  ],
 };
 
 /** access token -> user */
@@ -265,6 +336,17 @@ const server = createServer(async (req, res) => {
 
       if (table === 'client_facts' && url.searchParams.get('client_id') === `eq.${FIXTURE.clientId}`) {
         return json(res, 200, FIXTURE.facts);
+      }
+
+      if (table === 'projects' && idFilter === `eq.${FIXTURE.projectId}`) {
+        return json(res, 200, FIXTURE.project);
+      }
+
+      if (
+        table === 'research_notes' &&
+        url.searchParams.get('project_id') === `eq.${FIXTURE.projectId}`
+      ) {
+        return json(res, 200, FIXTURE.researchNotes);
       }
 
       if (wantsSingleObject) {

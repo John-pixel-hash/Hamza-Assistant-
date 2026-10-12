@@ -160,6 +160,7 @@ async function synthesize(
   question: string,
   sources: ResearchSource[],
   doFetch: typeof fetch,
+  timeoutMs = 30000,
 ): Promise<{ text: string | null; modelId: string | null }> {
   const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   if (!key) return { text: null, modelId: null };
@@ -174,7 +175,7 @@ async function synthesize(
             contents: [{ parts: [{ text: buildSynthPrompt(question, sources) }] }],
             generationConfig: { temperature: 0.2 },
           }),
-          signal: AbortSignal.timeout(30000),
+          signal: AbortSignal.timeout(timeoutMs),
         },
       );
       if (response.status === 429 || response.status === 503) continue;
@@ -190,7 +191,7 @@ async function synthesize(
 
 export async function researchQuestion(
   question: string,
-  overrides?: { fetchImpl?: typeof fetch; tavilyKey?: string },
+  overrides?: { fetchImpl?: typeof fetch; tavilyKey?: string; synthTimeoutMs?: number },
 ): Promise<ResearchResult> {
   const doFetch = overrides?.fetchImpl ?? fetch;
 
@@ -207,7 +208,12 @@ export async function researchQuestion(
     };
   }
 
-  const { text, modelId } = await synthesize(question, sources, doFetch);
+  const { text, modelId } = await synthesize(
+    question,
+    sources,
+    doFetch,
+    overrides?.synthTimeoutMs ?? 30000,
+  );
   if (!text) {
     // Retrieval worked but both synth models are down: show the raw sources so
     // the research is still useful.

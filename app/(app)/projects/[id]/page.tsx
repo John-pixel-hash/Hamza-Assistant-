@@ -2,7 +2,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { ProjectControls } from '@/components/project-controls';
 import { ProjectQuestions } from '@/components/project-questions';
+import { ProjectSteps } from '@/components/project-steps';
+import { ProjectUpdateDraft } from '@/components/project-update-draft';
 import { getProject } from '@/lib/data/projects';
 
 export const metadata: Metadata = { title: 'Project · Hamza Assistant' };
@@ -16,14 +19,6 @@ const STATUS_LABEL: Record<string, string> = {
   delivered: 'Delivered',
   on_hold: 'On hold',
   cancelled: 'Cancelled',
-};
-
-const STEP_LABEL: Record<string, string> = {
-  not_started: 'Not started',
-  in_progress: 'In progress',
-  blocked: 'Blocked',
-  review: 'In review',
-  done: 'Done',
 };
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
@@ -151,41 +146,47 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
       <section className="mt-5">
         <h2 className="h2">The plan</h2>
-        <div className="card mt-2 p-5">
-          {project.steps.length === 0 ? (
-            <>
-              <p className="font-medium">No plan yet</p>
-              <p className="mt-1 text-[14px] muted">
-                {openQuestions > 0
-                  ? `Answer the ${openQuestions} open ${openQuestions === 1 ? 'question' : 'questions'} first. The plan is built from your answers and researched method, never from guesses.`
-                  : 'Questions are closed. The research and step planner arrive in the next update of this page.'}
+        {project.steps.length === 0 ? (
+          <>
+            {openQuestions > 0 && (
+              <p className="mt-1 text-[13px] text-ink-soft">
+                {openQuestions} open {openQuestions === 1 ? 'question' : 'questions'} above will
+                become listed assumptions in the plan. Answer them and the plan gets sharper.
               </p>
-            </>
-          ) : (
-            <ul className="space-y-3">
-              {project.steps.map((step) => (
-                <li key={step.id} className="rounded-[14px] border border-line bg-surface p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-[14px] font-medium">
-                      {step.position}. {step.title}
-                    </p>
-                    <span className="shrink-0 text-[12px] text-ink-faint">
-                      {STEP_LABEL[step.status] ?? step.status}
-                    </span>
-                  </div>
-                  {step.detail && <p className="mt-1 text-[13px] text-ink-soft">{step.detail}</p>}
-                  {step.status === 'blocked' && step.blocked_reason && (
-                    <p className="mt-1 text-[13px] text-danger">
-                      <span className="font-medium">Blocked: </span>
-                      {step.blocked_reason}
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+            )}
+            <div className="mt-2">
+              <ProjectControls
+                projectId={project.id}
+                hasResearch={project.research.length > 0}
+                hasPlan={false}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            {Array.isArray(project.brief_json?.planning_assumptions) &&
+              (project.brief_json?.planning_assumptions?.length ?? 0) > 0 && (
+                <div className="alert alert-warn mt-2" role="status">
+                  <span className="font-medium">Assumed, not confirmed: </span>
+                  <ul className="mt-1 list-disc pl-5 text-[13px]">
+                    {project.brief_json?.planning_assumptions?.map((assumption) => (
+                      <li key={assumption}>{assumption}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            <div className="mt-2">
+              <ProjectSteps steps={project.steps} />
+            </div>
+          </>
+        )}
       </section>
+
+      {project.steps.length > 0 && (
+        <section className="mt-5">
+          <ProjectUpdateDraft projectId={project.id} />
+        </section>
+      )}
 
       {project.research.length > 0 && (
         <section className="mt-5">

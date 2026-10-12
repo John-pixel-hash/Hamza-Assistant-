@@ -83,6 +83,30 @@ export type ProjectQuestion = {
   answer: string | null;
 };
 
+export type ChecklistItem = { item: string; done: boolean };
+
+/**
+ * The checklist is jsonb, and two shapes have existed: the planner writes
+ * objects with a done flag, early fixtures were plain strings. Both read.
+ */
+export function normaliseChecklist(value: unknown): ChecklistItem[] {
+  if (!Array.isArray(value)) return [];
+  const out: ChecklistItem[] = [];
+  for (const entry of value) {
+    if (typeof entry === 'string' && entry.trim() !== '') {
+      out.push({ item: entry.trim(), done: false });
+    } else if (entry && typeof entry === 'object') {
+      const item = (entry as { item?: unknown }).item;
+      const done = (entry as { done?: unknown }).done === true;
+      if (typeof item === 'string' && item.trim() !== '') {
+        out.push({ item: item.trim(), done });
+      }
+    }
+    if (out.length >= 8) break;
+  }
+  return out;
+}
+
 export type ProjectStep = {
   id: string;
   position: number;
@@ -93,7 +117,7 @@ export type ProjectStep = {
   estimate_minutes: number | null;
   status: 'not_started' | 'in_progress' | 'blocked' | 'review' | 'done';
   blocked_reason: string | null;
-  quality_checklist: string[];
+  quality_checklist: ChecklistItem[];
 };
 
 export type ResearchNote = {
@@ -116,6 +140,7 @@ export type ProjectDetail = {
     success?: string[];
     next_step?: string;
     deadline_risk?: string | null;
+    planning_assumptions?: string[];
   } | null;
   deliverables: string[];
   deadline: string | null;
@@ -169,9 +194,7 @@ export async function getProject(id: string): Promise<ProjectDetail | null> {
   const steps: ProjectStep[] = (row.steps ?? [])
     .map((step) => ({
       ...step,
-      quality_checklist: Array.isArray(step.quality_checklist)
-        ? (step.quality_checklist.filter((item): item is string => typeof item === 'string'))
-        : [],
+      quality_checklist: normaliseChecklist(step.quality_checklist),
     }))
     .sort((a, b) => a.position - b.position);
 

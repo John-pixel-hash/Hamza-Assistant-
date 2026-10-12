@@ -365,6 +365,53 @@ async function main() {
     `status ${projectsHome.status}`,
   );
 
+  // Phase 6: the tracker screen. The fixture project has a done step, an in
+  // flight step with an unchecked checklist, an answered question, an
+  // assumption and one research note, so the whole delivery surface renders.
+  const projectPage = await fetch(`${APP}/projects/55555555-5555-4555-8555-555555555555`, {
+    headers: cookieHeader,
+    redirect: 'manual',
+  });
+  const projectHtml = await projectPage.text();
+  check(
+    'the project page restates the brief for the owner',
+    projectPage.status === 200 && /the brief, restated/i.test(projectHtml),
+    `status ${projectPage.status}`,
+  );
+  check(
+    'steps carry a quality checklist that gates them',
+    /quality checklist/i.test(projectHtml) && /test purchase event fires/i.test(projectHtml),
+    'nothing may be marked done without its checks passing',
+  );
+  check(
+    'a worked step shows as done and a live step can move on',
+    /done/i.test(projectHtml) && /send to review/i.test(projectHtml),
+    'the tracker must show where the work actually stands',
+  );
+  check(
+    'open assumptions are stated, not hidden',
+    /assumed, not confirmed/i.test(projectHtml) && /product photos by friday/i.test(projectHtml),
+    'assumptions made from open questions must be visible',
+  );
+  check(
+    'the research behind the method rides along with the plan',
+    /research behind the method/i.test(projectHtml) && /research\.example\/tracking/i.test(projectHtml),
+    'method advice must cite what it read',
+  );
+  check(
+    'the client update is drafted from the tracker',
+    /draft the update/i.test(projectHtml),
+    'status updates come from real progress only',
+  );
+  check(
+    'a project that does not exist returns a clean not found',
+    (await fetch(`${APP}/projects/00000000-0000-0000-0000-000000000000`, {
+      headers: cookieHeader,
+      redirect: 'manual',
+    })).status === 404,
+    'no stack traces, no half pages',
+  );
+
   // Production hardening. Both of these only matter once the app sits behind a
   // real domain and a CDN, which is how it will be deployed, so they are checked
   // here rather than assumed.
