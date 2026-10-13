@@ -82,3 +82,19 @@ is the point of opening a thread.
 Four harness checks now hold this in place: client messages render left, sent
 messages render right, the bar is the chat style bar, and the bar sits under
 the conversation.
+
+## Draft retry state and empty threads (2026-10-13)
+
+A previous failure is hidden while a retry is running, so the panel cannot say
+both "writing" and "failed" at once. The pending button keeps its contrast,
+shows a spinner, and changes its message if the run takes longer than usual.
+Thread-load errors are caught by the action and returned as a safe form state,
+not an unhandled server-action failure. The empty-thread hint is compact and
+explains that the pasted client message enters history when the sent reply is
+approved and saved.
+
+Quota, timeout, and transient network or provider failures move to the next
+allowed free Gemini model within the 40 second budget. Permanent request errors
+do not spend extra attempts. If every attempt fails, the server records a
+non-sensitive error category in `ai_runs` and the panel shows a short, useful
+message without losing the pasted text.

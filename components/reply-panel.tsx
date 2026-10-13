@@ -73,6 +73,18 @@ export function ReplyPanel({
 }) {
   const [draftState, draftAction, drafting] = useActionState(draftReplyAction, EMPTY_DRAFT_STATE);
   const [saveState, saveAction, saving] = useActionState(saveSentAction, SAVE_SENT_INITIAL);
+  const [slowDraft, setSlowDraft] = useState(false);
+  const retrying = drafting && Boolean(draftState.error);
+
+  useEffect(() => {
+    if (!drafting) {
+      setSlowDraft(false);
+      return;
+    }
+    setSlowDraft(false);
+    const timer = window.setTimeout(() => setSlowDraft(true), 20000);
+    return () => window.clearTimeout(timer);
+  }, [drafting]);
 
   const [incoming, setIncoming] = useState('');
   const [channel, setChannel] = useState(
@@ -223,17 +235,40 @@ export function ReplyPanel({
           type="text"
         />
 
-        <button className="btn btn-primary mt-3 w-full" disabled={drafting} type="submit">
-          {drafting ? 'Writing the draft...' : 'Draft the reply'}
-        </button>
-        <p className="mt-2 text-[12px] text-ink-faint">
+        <button
+          className={`btn btn-primary mt-3 w-full ${drafting ? 'btn-busy' : ''}`}
+          disabled={drafting}
+          type="submit"
+        >
+          {drafting && (
+            <svg
+              aria-hidden="true"
+              className="h-4 w-4 animate-spin"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.35" strokeWidth="3" />
+              <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeLinecap="round" strokeWidth="3" />
+            </svg>
+          )}
           {drafting
-            ? 'Reading the thread and writing. Stay on this screen.'
+            ? slowDraft
+              ? 'Still working...'
+              : retrying
+                ? 'Retrying your draft...'
+                : 'Writing your draft...'
+            : 'Draft the reply'}
+        </button>
+        <p className="mt-2 text-[12px] text-ink-faint" aria-live="polite" aria-atomic="true">
+          {drafting
+            ? slowDraft
+              ? 'Taking longer than usual. Your message is still here, and nothing is saved until you choose.'
+              : 'Reading the thread and writing your reply.'
             : 'Takes ten to twenty seconds, because it reads the whole thread first.'}
         </p>
       </form>
 
-      {draftState.error && (
+      {draftState.error && !drafting && (
         <div className="alert alert-warn mt-3" role="alert">
           {draftState.error}
         </div>

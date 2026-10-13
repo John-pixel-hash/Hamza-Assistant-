@@ -86,10 +86,10 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
           gold. The side and the colour say who spoke, so no role tags. */}
       <section className="mt-5 space-y-3" aria-label="Thread history">
         {messages.length === 0 ? (
-          <div className="card p-5">
-            <p className="font-medium">Empty thread</p>
-            <p className="mt-1 text-[14px] muted">
-              Paste the client message below, or upload a screenshot of it. Then save it to history.
+          <div className="rounded-xl border border-dashed border-line-strong bg-surface px-4 py-3">
+            <p className="text-[13px] font-medium text-ink-soft">No messages saved yet</p>
+            <p className="mt-0.5 text-[12px] muted">
+              A pasted client message is added to history when you save the reply you send.
             </p>
           </div>
         ) : (

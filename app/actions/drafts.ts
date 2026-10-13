@@ -8,6 +8,7 @@ import { getClientDetail, getClientFacts } from '@/lib/data/clients';
 import { getClientProjectContext } from '@/lib/data/projects';
 import { getThread } from '@/lib/data/threads';
 import { draftReply } from '@/lib/ai/draft';
+import { draftFailureMessage } from '@/lib/ai/draft-errors';
 import { runMemoryPass } from '@/lib/ai/memory-live';
 import type { Tone } from '@/lib/ai/voice';
 
@@ -65,12 +66,13 @@ export async function draftReplyAction(
     return { ...base, error: 'That thread could not be found.' };
   }
 
-  const loaded = await loadConversation(threadId);
-  if (!loaded) return { ...base, error: 'That thread could not be found.' };
-
-  const { detail, client, facts, projects } = loaded;
-
+  let stage = 'loading the thread';
   try {
+    const loaded = await loadConversation(threadId);
+    if (!loaded) return { ...base, error: 'That thread could not be found.' };
+
+    const { detail, client, facts, projects } = loaded;
+    stage = 'writing the draft';
     const outcome = await draftReply({
       channel,
       tone,
@@ -125,13 +127,14 @@ export async function draftReplyAction(
       channel,
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[drafts] failed', message);
+    const message = error instanceof Error ? error.message : '';
+    const name = error instanceof Error ? error.name : 'UnknownError';
+    console.error(`[drafts] ${stage} failed`, { name, message });
     return {
       ...base,
-      error: /GOOGLE_GENERATIVE_AI_API_KEY/.test(message)
+      error: /GOOGLE_(?:GENERATIVE_AI_)?API_KEY/.test(message)
         ? 'The Google key is missing, so no draft can be written. Add it and redeploy.'
-        : 'The draft failed. Nothing was saved. Try again in a moment.',
+        : draftFailureMessage(error),
     };
   }
 }

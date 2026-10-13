@@ -5,6 +5,7 @@ import { generateText, type LanguageModel } from 'ai';
 import { buildKnowledgeBlock } from './knowledge';
 import { getActivePlaybooks } from '../data/knowledge';
 import { getModelFor, modelFor } from './provider';
+import { classifyDraftError, isRetryableDraftError } from './draft-errors';
 import { DRAFT_FALLBACK_MODEL, modelChain, sleepMs } from './routing';
 
 // Drafts share the 60 second serverless window with everything else the
@@ -29,8 +30,9 @@ import {
  * draft is acceptable lives in draft-core so it can be tested without a
  * network, a database, or a Next.js runtime.
  *
- * The owner is on the free tier, so a draft uses one call normally and two at
- * most. Anything more would burn the daily allowance on a single message.
+ * A normal draft uses one call, with a repair call only when the first text
+ * breaks a style rule. Transient provider failures may switch to another free
+ * model, within the explicit 40 second budget and never to a paid model.
  */
 
 export {
@@ -40,24 +42,6 @@ export {
   draftReplyWith,
 } from './draft-core';
 export type { DraftOutcome, DraftRequest, GenerateFn } from './draft-core';
-
-/** Walks the AI SDK's nested error shapes looking for a refusal that the lite
- * model can take over: quota 429s, and 503 demand spikes on the primary. */
-function isQuotaError(error: unknown, depth = 0): boolean {
-  if (!error || typeof error !== 'object' || depth > 4) return false;
-  const e = error as Record<string, unknown>;
-  if (e.statusCode === 429 || e.statusCode === 503) return true;
-  if (
-    typeof e.message === 'string' &&
-    /RESOURCE_EXHAUSTED|QuotaFailure|UNAVAILABLE|high demand/i.test(e.message)
-  ) {
-    return true;
-  }
-  const nested = Array.isArray(e.errors)
-    ? (e.errors as unknown[])
-    : [e.cause, e.error].filter(Boolean);
-  return nested.some((n) => isQuotaError(n, depth + 1));
-}
 
 export async function draftReply(
   request: DraftRequest,
@@ -89,15 +73,15 @@ export async function draftReply(
   let usedResolved = startFast
     ? { ...resolved, modelId: firstModelId, reason: 'capture fast path' }
     : resolved;
-  let quotaFallback = false;
+  let fallbackUsed = false;
 
-  // The routed model first, then every other free tier model. Quota is per
-  // model id, so a spike that locks one leaves the others with allowance.
-  // A refusal moves the draft on after a short pause; any other error
-  // rethrows, because retrying a refusal of a different kind wastes seconds.
+  // Try the routed model first, then the other free-tier models on quota,
+  // timeout, or transient provider errors. Do not spend extra attempts on a
+  // permanent error such as an invalid request.
   const started = Date.now();
   let outcome: DraftOutcome | null = null;
   let lastError: unknown = null;
+  const triedModels: string[] = [];
 
   for (const [index, modelId] of modelChain(firstModelId).entries()) {
     if (index > 0) {
@@ -108,21 +92,34 @@ export async function draftReply(
         ...resolved,
         modelId,
         fellBack: true,
-        reason: 'quota spike fallback',
+        reason: 'transient provider failure fallback',
       };
-      quotaFallback = true;
+      fallbackUsed = true;
     }
+    triedModels.push(modelId);
     try {
       outcome = await draftReplyWith(aiSdkGenerator(usedModel, DRAFT_ATTEMPT_TIMEOUT_MS), request);
       lastError = null;
       break;
     } catch (error) {
       lastError = error;
-      if (!isQuotaError(error)) throw error;
+      if (!isRetryableDraftError(error)) break;
     }
   }
 
-  if (!outcome) throw lastError;
+  if (!outcome) {
+    const failureKind = classifyDraftError(lastError);
+    await logRun({
+      task: 'reply_draft',
+      resolved: usedResolved,
+      threadId: request.context.thread.id,
+      latencyMs: Date.now() - started,
+      status: 'error',
+      guardrailActions: { modelFallback: fallbackUsed, triedModels, failureKind },
+      errorMessage: `provider failure: ${failureKind}`,
+    });
+    throw lastError ?? new Error('All free-tier draft models failed.');
+  }
 
   await logRun({
     task: 'reply_draft',
@@ -131,7 +128,7 @@ export async function draftReply(
     inputTokens: outcome.usage.inputTokens,
     outputTokens: outcome.usage.outputTokens,
     latencyMs: outcome.latencyMs,
-    status: quotaFallback
+    status: fallbackUsed
       ? 'fallback'
       : outcome.ok
         ? outcome.fixed
@@ -143,7 +140,7 @@ export async function draftReply(
       attempts: outcome.attempts,
       fixed: outcome.fixed,
       problems: outcome.problems,
-      quotaFallback,
+      modelFallback: fallbackUsed,
     },
     errorMessage: outcome.ok ? null : outcome.problems.join(' '),
   });
@@ -159,8 +156,8 @@ export function aiSdkGenerator(model: LanguageModel, timeoutMs = 25000): Generat
       system,
       prompt,
       maxOutputTokens,
-      // One shot per model, hard capped. The quota/spike fallback owns
-      // retries, because SDK backoff can eat the 60 second serverless budget.
+      // One shot per model, hard capped. The explicit free-model fallback
+      // owns retries, because SDK backoff can eat the 60 second serverless budget.
       abortSignal: AbortSignal.timeout(timeoutMs),
     });
     return {

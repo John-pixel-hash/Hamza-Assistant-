@@ -168,6 +168,11 @@ textarea.field {
   cursor: not-allowed;
 }
 
+.btn-busy:disabled {
+  opacity: 0.92;
+  cursor: progress;
+}
+
 .btn-primary {
   background: var(--color-brand);
   color: #fff;
