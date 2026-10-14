@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ClientForm } from '@/components/client-form';
+import { PageHeading } from '@/components/page-heading';
 import { getClientDetail } from '@/lib/data/clients';
 
 export const metadata: Metadata = { title: 'Edit client' };
@@ -18,15 +19,14 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
 
   return (
     <>
-      <Link className="text-[13px] font-medium text-brand" href={`/clients/${client.id}`}>
+      <Link className="page-back-link" href={`/clients/${client.id}`}>
         Back to {client.name}
       </Link>
-
-      <div className="mt-3 mb-5">
-        <p className="eyebrow">Edit</p>
-        <h1 className="h1 mt-1">{client.name}</h1>
-        <p className="mt-1 text-[14px] muted">Update anything that has changed. Save and go straight back.</p>
-      </div>
+      <PageHeading
+        eyebrow="Client details"
+        title="Edit client"
+        description="Update the record and save your changes."
+      />
 
       <ClientForm
         defaults={{

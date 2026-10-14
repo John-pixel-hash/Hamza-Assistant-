@@ -332,11 +332,12 @@ async function main() {
 
   const p4 = todayHtml.indexOf('Phase 4 · Memory engine');
   const p5 = todayHtml.indexOf('Phase 5 · Research engine');
-  const here = todayHtml.indexOf('you are here');
+  const p8 = todayHtml.indexOf('Phase 8 · Hardening, cost dashboard, documentation');
+  const current = todayHtml.indexOf('· current', p8);
   check(
-    'the build status card matches reality: memory engine done, research next',
-    p4 !== -1 && p5 > p4 && here > p5,
-    'the dashboard must never claim an old phase',
+    'the build notes keep completed phases complete and identify current work',
+    p4 !== -1 && p5 > p4 && p8 > p5 && current > p8,
+    'the dashboard must not mark completed work as current',
   );
 
   for (const path of ['/clients', '/clients/new', '/chat', '/research', '/search', '/projects', '/projects/new', '/knowledge', '/settings']) {
@@ -369,7 +370,7 @@ async function main() {
   );
   check(
     'the intake form sets expectations: it restates, asks, and sends nothing',
-    /restates the brief/i.test(newProjectHtml) && /nothing is sent to the client/i.test(newProjectHtml),
+    /restate it/i.test(newProjectHtml) && /the brief/i.test(newProjectHtml) && /nothing is sent to the client/i.test(newProjectHtml),
     'the form must say what the pass does and that no client message leaves the app',
   );
   const projectsHome = await fetch(`${APP}/projects`, { headers: cookieHeader, redirect: 'manual' });
@@ -437,8 +438,8 @@ async function main() {
     `status ${knowledge.status}`,
   );
   check(
-    'the dashboard carries the knowledge entry point',
-    todayHtml.includes('Knowledge'),
+    'the dashboard carries the playbook entry point',
+    todayHtml.includes('Playbooks') && todayHtml.includes('href="/knowledge"'),
     'one tap from Today, like Chat and Research',
   );
 
@@ -530,12 +531,12 @@ async function main() {
   );
   check(
     'the panel warns how long a draft takes, rather than looking frozen',
-    /ten to twenty seconds/i.test(threadHtml),
+    /6 to 18 seconds/i.test(threadHtml),
     'a real draft takes 6 to 18 seconds, so the panel has to say so',
   );
   check(
     'the panel quotes the last client message, so context is visible without scrolling',
-    /Last from them:/i.test(threadHtml) && /Can you do 150\?/.test(threadHtml),
+    /Latest from client/i.test(threadHtml) && /Can you do 150\?/.test(threadHtml),
     'on a phone the thread can be eighty messages long, so the panel carries the key line itself',
   );
   check(
@@ -573,13 +574,13 @@ async function main() {
   );
   check(
     'the thread composer is the chat-style bar',
-    threadHtml.includes('Attach screenshot') &&
+    threadHtml.includes('Attach a file to this message') &&
       threadHtml.includes('Add a message to this thread'),
     'one bar with attach, text and send, not the old card form',
   );
   check(
     'the composer bar sits under the conversation',
-    threadHtml.indexOf('Thread history') < threadHtml.indexOf('Attach screenshot'),
+    threadHtml.indexOf('Thread history') < threadHtml.indexOf('Attach a file to this message'),
     'the history scrolls above, the bar waits at the bottom',
   );
 

@@ -92,7 +92,8 @@ function StepCard({ step }: { step: ProjectStep }) {
                     type="submit"
                     disabled={pending || step.status === 'done'}
                     aria-pressed={item.done}
-                    className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border border-line-strong text-[10px] text-white disabled:opacity-50"
+                    aria-label={`${item.done ? 'Uncheck' : 'Check'} ${item.item}`}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-line-strong text-[14px] text-white disabled:opacity-50"
                     style={item.done ? { background: '#1d4ed8', borderColor: '#1d4ed8' } : undefined}
                     title={step.status === 'done' ? 'Checklist locked, step is done' : 'Toggle this check'}
                   >

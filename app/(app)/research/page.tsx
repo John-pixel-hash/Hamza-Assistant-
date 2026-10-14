@@ -1,3 +1,4 @@
+import { PageHeading } from '@/components/page-heading';
 import { ResearchForm } from '@/components/research-form';
 
 export const dynamic = 'force-dynamic';
@@ -8,15 +9,12 @@ export const metadata = { title: 'Research · Hamza Assistant' };
 export default function ResearchPage() {
   return (
     <>
-      <p className="eyebrow">Research</p>
-      <h1 className="h1 mt-1">Check before you advise</h1>
-      <p className="mt-2 text-[14px] muted">
-        Ask anything technical or strategic. The answer comes from live search
-        results and shows its sources, so nothing here is a guess.
-      </p>
-      <div className="mt-4">
-        <ResearchForm />
-      </div>
+      <PageHeading
+        eyebrow="Live sources"
+        title="Research"
+        description="Check technical or strategic questions against current sources before you advise."
+      />
+      <ResearchForm />
     </>
   );
 }

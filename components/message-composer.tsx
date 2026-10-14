@@ -97,7 +97,7 @@ export function MessageComposer({
         setUpload({ uploading: false, uploaded: [], error: null });
         setHasText(false);
       }}
-      className="card mt-5 rounded-3xl p-3"
+      className="card mt-5 rounded-2xl p-3"
       aria-label="Add a message to this thread"
     >
       {state.error && (
@@ -157,13 +157,17 @@ export function MessageComposer({
 
       <div className="flex items-end gap-2">
         <label
-          className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full border border-line-strong text-ink-faint"
-          title="Attach screenshot"
+          htmlFor="thread-attachment"
+          className="flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center rounded-full border border-line-strong text-ink-faint"
+          title="Attach a file"
+          aria-label="Attach a file to this message"
         >
           <svg aria-hidden viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
             <path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z" />
           </svg>
           <input
+            id="thread-attachment"
+            aria-label="Attach a file to this message"
             type="file"
             className="sr-only"
             multiple
@@ -182,10 +186,11 @@ export function MessageComposer({
         />
 
         <button
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand text-white disabled:opacity-40"
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand text-white disabled:opacity-40"
           type="submit"
           disabled={pending || upload.uploading || !hasText}
           title={pending ? 'Saving...' : 'Save to history'}
+          aria-label={pending ? 'Saving message to history' : 'Save message to history'}
         >
           <svg aria-hidden viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
             <path d="M12 4l6 6h-4v10h-4V10H8z" />

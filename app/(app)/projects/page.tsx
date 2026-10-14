@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { EmptyState } from '@/components/empty-state';
+import { PageHeading } from '@/components/page-heading';
 import { getProjects } from '@/lib/data/projects';
 
 export const metadata: Metadata = { title: 'Projects' };
@@ -21,19 +22,14 @@ export default async function ProjectsPage() {
 
   return (
     <>
-      <div className="mb-5 flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Projects</h1>
-          <p className="mt-1 text-[14px] text-ink-soft">
-            {ready
-              ? `${projects.length} ${projects.length === 1 ? 'project' : 'projects'} tracked`
-              : 'Not connected yet'}
-          </p>
-        </div>
-        <Link className="btn btn-primary shrink-0" href="/projects/new">
-          New project
-        </Link>
-      </div>
+      <PageHeading
+        eyebrow="Project delivery"
+        title="Projects"
+        description={ready
+          ? `${projects.length} ${projects.length === 1 ? 'project' : 'projects'} tracked`
+          : 'Project records are not connected yet.'}
+        actions={<Link className="btn btn-primary" href="/projects/new">New project</Link>}
+      />
 
       {!ready ? (
         <div className="alert alert-warn mb-5">

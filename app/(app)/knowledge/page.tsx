@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 
+import { PageHeading } from '@/components/page-heading';
 import { PlaybookCard } from '@/components/playbook-card';
 import { getAllPlaybooks } from '@/lib/data/knowledge';
 
@@ -12,13 +13,11 @@ export default async function KnowledgePage() {
 
   return (
     <>
-      <p className="eyebrow">Operating knowledge</p>
-      <h1 className="h1 mt-1">Playbooks</h1>
-      <p className="mt-2 text-[14px] muted">
-        The expert modules the assistant loads when a request matches them: checklists and
-        decision trees, not essays. Time sensitive ones rot on a schedule, and the research
-        engine re-verifies their numbers. Edit them and they version.
-      </p>
+      <PageHeading
+        eyebrow="Your working knowledge"
+        title="Playbooks"
+        description="Practical checklists and decision guides the assistant can use. Review or update a module any time."
+      />
 
       {!ready ? (
         <div className="alert alert-warn mt-4">

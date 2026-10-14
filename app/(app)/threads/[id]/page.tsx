@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { MessageComposer } from '@/components/message-composer';
+import { PageHeading } from '@/components/page-heading';
 import { ReplyPanel } from '@/components/reply-panel';
 import { getThread } from '@/lib/data/threads';
 import { CHANNEL_LABELS, STAGE_LABELS } from '@/lib/domain';
@@ -48,28 +49,17 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
 
   return (
     <>
-      <Link
-        className="text-[13px] font-medium text-brand"
-        href={client ? `/clients/${client.id}` : '/clients'}
-      >
+      <Link className="page-back-link" href={client ? `/clients/${client.id}` : '/clients'}>
         {client ? `Back to ${client.name}` : 'Back to clients'}
       </Link>
 
-      <header className="card mt-3 p-4">
-        <p className="eyebrow">{MODE_LABELS[thread.mode] ?? thread.mode}</p>
-        <h1 className="h1 mt-1">{thread.title}</h1>
-        <p className="mt-1 text-[13px] muted">
-          {client ? (
-            <>
-              {client.name}
-              {client.company ? ` · ${client.company}` : ''} ·{' '}
-              {STAGE_LABELS[client.stage as keyof typeof STAGE_LABELS] ?? client.stage}
-            </>
-          ) : (
-            'No client linked'
-          )}
-        </p>
-      </header>
+      <PageHeading
+        eyebrow={MODE_LABELS[thread.mode] ?? thread.mode}
+        title={thread.title}
+        description={client
+          ? `${client.name}${client.company ? ` · ${client.company}` : ''} · ${STAGE_LABELS[client.stage as keyof typeof STAGE_LABELS] ?? client.stage}`
+          : 'No client linked'}
+      />
 
       {/* The panel sits above the conversation: on a phone the draft is the
           point of opening a thread, and the history is one scroll away. The

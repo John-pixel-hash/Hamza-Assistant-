@@ -282,11 +282,10 @@ export function ChatCapture() {
   const hasConversation = state.ok || Boolean(state.extracted?.length) || Boolean(state.needsName);
 
   return (
-    <div className="flex min-h-[62vh] flex-col justify-end">
+    <div className="chat-capture-workspace flex flex-col justify-end">
       {!hasConversation && (
         <p className="mb-4 text-center text-[13px] text-ink-faint">
-          Pick up to 10 screenshots in conversation order. Reorder or remove them
-          before sending. I will read them together and write one reply you can copy.
+          Choose up to 10 screenshots in conversation order. Reorder or remove them before sending. I will combine the conversation, save new messages, and draft one reply.
         </p>
       )}
 
@@ -379,7 +378,7 @@ export function ChatCapture() {
             setSelectionChanged(false);
             await formAction(formData);
           }}
-          className="card mt-4 rounded-3xl p-3"
+          className="card mt-4 rounded-2xl p-3"
         >
           {state.error && !state.needsName && !pending && !selectionChanged && (
             <div className="alert alert-error mb-2" role="alert">
@@ -411,7 +410,7 @@ export function ChatCapture() {
                 name="client_name"
                 type="text"
                 required
-                className="input mt-1"
+                className="field mt-1"
                 placeholder="Client name"
               />
             </label>
@@ -427,20 +426,20 @@ export function ChatCapture() {
               </div>
               <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Selected screenshots">
                 {selectedUploads.map((item, index) => (
-                  <div key={item.path} className="w-24 shrink-0 rounded-xl border border-line bg-surface p-1.5">
+                  <div key={item.path} className="w-36 shrink-0 rounded-xl border border-line bg-surface p-2">
                     {item.previewUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={item.previewUrl}
                         alt={`Screenshot ${index + 1}`}
-                        className="h-16 w-full rounded-lg object-cover"
+                        className="h-20 w-full rounded-lg object-cover"
                       />
                     ) : (
-                      <div className="flex h-16 items-center justify-center rounded-lg bg-line text-[11px] text-ink-faint">
+                      <div className="flex h-20 items-center justify-center rounded-lg bg-line text-[12px] text-ink-faint">
                         Image {index + 1}
                       </div>
                     )}
-                    <p className="mt-1 truncate text-[10px] text-ink-faint" title={item.name}>
+                    <p className="mt-1 truncate text-[12px] text-ink-faint" title={item.name}>
                       {index + 1}. {item.name}
                     </p>
                     <div className="mt-1 flex items-center justify-between">
@@ -450,9 +449,9 @@ export function ChatCapture() {
                         disabled={index === 0 || pending || upload.uploading}
                         aria-label={`Move screenshot ${index + 1} earlier`}
                         title="Move earlier"
-                        className="flex h-7 w-7 items-center justify-center rounded-full text-ink-soft disabled:opacity-30"
+                        className="flex h-10 w-10 items-center justify-center rounded-full text-ink-soft disabled:opacity-30"
                       >
-                        <svg aria-hidden viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
+                        <svg aria-hidden viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
                           <path d="m12 5-7 7 1.4 1.4 4.6-4.6V20h2V8.8l4.6 4.6L19 12z" />
                         </svg>
                       </button>
@@ -462,9 +461,9 @@ export function ChatCapture() {
                         disabled={pending || upload.uploading}
                         aria-label={`Remove screenshot ${index + 1}`}
                         title="Remove screenshot"
-                        className="flex h-7 w-7 items-center justify-center rounded-full text-ink-soft disabled:opacity-30"
+                        className="flex h-10 w-10 items-center justify-center rounded-full text-ink-soft disabled:opacity-30"
                       >
-                        <svg aria-hidden viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
+                        <svg aria-hidden viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
                           <path d="M7 6 5.6 7.4 10.2 12l-4.6 4.6L7 18l5-5 5 5 1.4-1.4L13.8 12l4.6-4.6L17 6l-5 5z" />
                         </svg>
                       </button>
@@ -474,9 +473,9 @@ export function ChatCapture() {
                         disabled={index === selectedUploads.length - 1 || pending || upload.uploading}
                         aria-label={`Move screenshot ${index + 1} later`}
                         title="Move later"
-                        className="flex h-7 w-7 items-center justify-center rounded-full text-ink-soft disabled:opacity-30"
+                        className="flex h-10 w-10 items-center justify-center rounded-full text-ink-soft disabled:opacity-30"
                       >
-                        <svg aria-hidden viewBox="0 0 24 24" className="h-4 w-4 rotate-180" fill="currentColor">
+                        <svg aria-hidden viewBox="0 0 24 24" className="h-5 w-5 rotate-180" fill="currentColor">
                           <path d="m12 5-7 7 1.4 1.4 4.6-4.6V20h2V8.8l4.6 4.6L19 12z" />
                         </svg>
                       </button>
@@ -489,7 +488,7 @@ export function ChatCapture() {
 
           <div className="flex items-center gap-2">
             <label
-              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line-strong text-ink-faint ${
+              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-line-strong text-ink-faint ${
                 upload.uploading || pending || selectedUploads.length >= MAX_CHAT_SCREENSHOTS
                   ? 'cursor-not-allowed opacity-40'
                   : 'cursor-pointer'
@@ -506,6 +505,7 @@ export function ChatCapture() {
               ref={fileRef}
               type="file"
               accept="image/png,image/jpeg,image/webp"
+              aria-label="Add screenshots"
               multiple
               disabled={upload.uploading || pending || selectedUploads.length >= MAX_CHAT_SCREENSHOTS}
               onChange={(event) => {
@@ -523,14 +523,14 @@ export function ChatCapture() {
                   : 'Add screenshots of the conversation'}
             </p>
             <button
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand text-white disabled:opacity-40"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand text-white disabled:opacity-40"
               type="submit"
               disabled={pending || upload.uploading || selectedUploads.length === 0}
               title="Send"
               aria-label="Read screenshots and write a reply"
             >
               <svg aria-hidden viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
-                <path d="M12 4l6 6h-4v10h-4V10H8z" />
+                <path d="m2 21 21-9L2 3v7l15 2-15 2z" />
               </svg>
             </button>
           </div>

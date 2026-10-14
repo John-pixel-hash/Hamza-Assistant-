@@ -26,7 +26,7 @@ export function SetupChecklist({
               aria-hidden
               className={
                 item.done
-                  ? 'mt-[3px] h-4 w-4 shrink-0 rounded-full bg-accent text-center text-[10px] leading-4 text-white'
+                  ? 'mt-[3px] h-4 w-4 shrink-0 rounded-full bg-brand text-center text-[10px] leading-4 text-white'
                   : 'mt-[3px] h-4 w-4 shrink-0 rounded-full border border-line'
               }
             >

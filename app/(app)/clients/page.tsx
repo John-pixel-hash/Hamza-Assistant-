@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { EmptyState } from '@/components/empty-state';
+import { PageHeading } from '@/components/page-heading';
 import { SearchBar, StageFilter } from '@/components/search-bar';
 import { StageBadge } from '@/components/ui';
 import { getClients } from '@/lib/data/clients';
@@ -21,20 +22,14 @@ export default async function ClientsPage({
 
   return (
     <>
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <p className="eyebrow">Client memory</p>
-          <h1 className="h1 mt-1">Clients</h1>
-          <p className="mt-1 text-[14px] muted">
-            {ready
-              ? `${clients.length} ${clients.length === 1 ? 'client' : 'clients'}${q || activeStage ? ' matching' : ''}`
-              : 'Not connected'}
-          </p>
-        </div>
-        <Link className="btn btn-primary btn-small shrink-0" href="/clients/new">
-          Add client
-        </Link>
-      </div>
+      <PageHeading
+        eyebrow="Client memory"
+        title="Clients"
+        description={ready
+          ? `${clients.length} ${clients.length === 1 ? 'client' : 'clients'}${q || activeStage ? ' match your filters' : ' in your workspace'}`
+          : 'Client records are not connected.'}
+        actions={<Link className="btn btn-primary" href="/clients/new">Add client</Link>}
+      />
 
       <div className="mb-3">
         <SearchBar

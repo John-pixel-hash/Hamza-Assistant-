@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { SetupChecklist } from '@/components/setup-checklist';
 import { EmptyState } from '@/components/empty-state';
+import { PageHeading } from '@/components/page-heading';
 import { StageBadge, StatTile } from '@/components/ui';
 import { getOverview } from '@/lib/data/overview';
 import { latestThreadIdsForClients } from '@/lib/data/threads';
@@ -33,26 +34,19 @@ export default async function TodayPage() {
 
   return (
     <>
-      <div className="mb-5 flex items-end justify-between gap-3">
-        <div>
-          <p className="eyebrow">{todayLine()}</p>
-          <h1 className="h1 mt-1">Today</h1>
-        </div>
-        <div className="flex shrink-0 flex-wrap justify-end gap-2">
-          <Link className="btn btn-primary" href="/chat">
-            Chat
-          </Link>
-          <Link className="btn btn-quiet" href="/research">
-            Research
-          </Link>
-          <Link className="btn btn-quiet" href="/knowledge">
-            Knowledge
-          </Link>
-          <Link className="btn btn-primary btn-small shrink-0" href="/clients/new">
-            Add client
-          </Link>
-        </div>
-      </div>
+      <PageHeading
+        eyebrow={todayLine()}
+        title="Today"
+        description="Your clients, follow-ups, and projects in one place."
+        actions={(
+          <>
+            <Link className="btn btn-primary" href="/chat">Open chat</Link>
+            <Link className="btn btn-quiet" href="/clients/new">Add client</Link>
+            <Link className="btn btn-quiet" href="/research">Research</Link>
+            <Link className="btn btn-quiet" href="/knowledge">Playbooks</Link>
+          </>
+        )}
+      />
 
       {overview.connected && !overview.schemaReady && (
         <div className="alert alert-warn mb-5">
@@ -142,9 +136,12 @@ export default async function TodayPage() {
         )}
       </section>
 
-      <section>
-        <h2 className="h2 mb-3">Build status</h2>
-        <div className="card p-4">
+      <details className="disclosure card section-block">
+        <summary>
+          <span>Build notes</span>
+          <span className="text-[12px] font-medium text-ink-faint">Private to you</span>
+        </summary>
+        <div className="border-t border-line p-4">
           <ul className="space-y-2 text-[14px]">
             {BUILD_STEPS.map((step) => (
               <li key={step.label} className="flex items-start gap-3">
@@ -162,16 +159,17 @@ export default async function TodayPage() {
                 </span>
                 <span className={step.done ? 'muted' : ''}>
                   {step.label}
-                  {step.current && <span className="font-semibold text-gold"> · you are here</span>}
+                  {step.current && <span className="font-semibold text-gold"> · current</span>}
                 </span>
               </li>
             ))}
           </ul>
           <p className="mt-4 text-[13px] text-ink-faint">
-            {overview.counts.playbooksWritten} of 9 knowledge modules written. Those land in Phase 7.
+            {overview.counts.playbooksWritten} of 9 knowledge modules written. Phase 8 adds the usage
+            dashboard, data export, and the written guides.
           </p>
         </div>
-      </section>
+      </details>
     </>
   );
 }
@@ -184,8 +182,8 @@ const BUILD_STEPS: { label: string; done: boolean; current?: boolean }[] = [
   { label: 'Phase 4 · Memory engine: facts, summaries, semantic recall', done: true },
   { label: 'Phase 5 · Research engine: sourced answers, no guessing', done: true },
   { label: 'Phase 6 · Project delivery mode', done: true },
-  { label: 'Phase 7 · The nine domain playbooks', done: false, current: true },
-  { label: 'Phase 8 · Hardening, cost dashboard, documentation', done: false },
+  { label: 'Phase 7 · The nine domain playbooks', done: true },
+  { label: 'Phase 8 · Hardening, cost dashboard, documentation', done: false, current: true },
 ];
 
 function todayLine(): string {

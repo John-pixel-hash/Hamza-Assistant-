@@ -16,7 +16,7 @@ export function ResearchForm() {
         action={async (formData: FormData) => {
           await formAction(formData);
         }}
-        className="card rounded-3xl p-3"
+        className="card rounded-2xl p-3"
       >
         {state.error && (
           <div className="alert alert-error mb-2" role="alert">
@@ -30,14 +30,15 @@ export function ResearchForm() {
             onChange={(event) => setQuestion(event.target.value)}
             rows={2}
             required
-            className="input flex-1 resize-none"
-            placeholder="What should I check? Example: what does a 5 page WordPress site cost in 2026"
+            className="field flex-1 resize-none"
+            placeholder="What do you want to verify?"
           />
           <button
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand text-white disabled:opacity-40"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand text-white disabled:opacity-40"
             type="submit"
             disabled={pending || question.trim().length === 0}
-            title="Research"
+            aria-label={pending ? 'Researching your question' : 'Search current sources'}
+            title="Search current sources"
           >
             <svg aria-hidden viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
               <path d="M10.5 3a7.5 7.5 0 1 0 4.6 13.4l4.2 4.2 1.4-1.4-4.2-4.2A7.5 7.5 0 0 0 10.5 3Zm0 2a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11Z" />
@@ -47,7 +48,7 @@ export function ResearchForm() {
       </form>
 
       {pending && (
-        <p className="mt-4 text-center text-[13px] text-ink-faint">Searching and reading sources...</p>
+        <p className="mt-4 text-center text-[13px] text-ink-faint" role="status" aria-live="polite">Checking current sources...</p>
       )}
 
       {(state.answer || state.sources.length > 0) && (

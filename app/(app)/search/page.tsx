@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { PageHeading } from '@/components/page-heading';
 import { SearchBar } from '@/components/search-bar';
 import { Highlight, RoleTag } from '@/components/ui';
 import { searchMessages } from '@/lib/data/search';
@@ -20,15 +21,13 @@ export default async function SearchPage({
 
   return (
     <>
-      <div className="mb-4">
-        <p className="eyebrow">Every conversation</p>
-        <h1 className="h1 mt-1">Search</h1>
-        <p className="mt-1 text-[14px] muted">
-          All words must appear, the way a web search works. Use OR to widen it, and quotes for a phrase.
-        </p>
-      </div>
+      <PageHeading
+        eyebrow="Conversation history"
+        title="Search"
+        description="Find saved messages across every client. Use quotes for an exact phrase or OR to broaden a search."
+      />
 
-      <SearchBar action="/search" defaultValue={query} placeholder="quote, deposit, deadline, OR" />
+      <SearchBar action="/search" defaultValue={query} placeholder="Search messages and phrases" />
 
       <div className="mt-5">
         {query.length < 2 ? (

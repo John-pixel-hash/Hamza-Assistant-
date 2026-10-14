@@ -21,7 +21,7 @@ export function ProjectIntakeForm({
   const [state, formAction, pending] = useActionState(createProjectAction, initialState);
 
   return (
-    <form action={formAction} className="card p-4">
+    <form action={formAction} className="card p-4 sm:p-5">
       {state.error && (
         <div className="alert alert-error mb-3" role="alert">
           {state.error}
@@ -61,8 +61,8 @@ export function ProjectIntakeForm({
         name="brief"
         required
         minLength={20}
-        rows={6}
-        placeholder="Paste what the client asked for, or write it yourself. Include everything they said about the site, the deadline, the budget, and anything they are vague about. Vague parts are fine, they become questions."
+        rows={5}
+        placeholder="Include the requested work, deliverables, budget, deadline, and anything still unclear. Unclear details become questions."
       />
 
       <label className="label mt-3" htmlFor="project-deliverables">
@@ -76,7 +76,7 @@ export function ProjectIntakeForm({
         placeholder={'5 page WordPress site\nContact form to email\nBasic SEO setup'}
       />
 
-      <div className="mt-3 grid grid-cols-2 gap-3">
+      <div className="mt-3 grid grid-cols-1 gap-3 min-[390px]:grid-cols-2">
         <div>
           <label className="label" htmlFor="project-deadline">
             Deadline (optional)
@@ -109,12 +109,12 @@ export function ProjectIntakeForm({
       </div>
 
       <button className="btn btn-primary mt-4 w-full" type="submit" disabled={pending}>
-        {pending ? 'Reading the brief and writing the questions...' : 'Create the project'}
+        {pending ? 'Creating project...' : 'Create project'}
       </button>
-      <p className="mt-2 text-[12px] text-ink-faint">
+      <p className="mt-2 text-[13px] text-ink-faint" role="status" aria-live="polite">
         {pending
-          ? 'Restating your brief and finding the gaps. Takes ten to twenty seconds. Stay on this screen.'
-          : 'It restates the brief and writes the questions a professional asks before planning. Nothing is sent to the client.'}
+          ? 'Reviewing the brief and finding gaps. This may take up to 20 seconds.'
+          : 'The project stays private. Review the brief and questions before planning.'}
       </p>
     </form>
   );

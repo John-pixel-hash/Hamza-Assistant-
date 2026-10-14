@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { EmptyState } from '@/components/empty-state';
 import { NewThreadForm } from '@/components/new-thread-form';
+import { PageHeading } from '@/components/page-heading';
 import { StageBadge, RoleTag } from '@/components/ui';
 import { getClientDetail, getClientFacts, getClientMessages } from '@/lib/data/clients';
 import { getClientThreads } from '@/lib/data/threads';
@@ -63,26 +64,25 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
 
   return (
     <>
-      <Link className="text-[13px] font-medium text-brand" href="/clients">
-        Back to clients
-      </Link>
+      <Link className="page-back-link" href="/clients">Back to clients</Link>
 
-      {/* Identity and state */}
-      <section className="card mt-3 p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h1 className="h1 truncate">{client.name}</h1>
-            <p className="mt-1 text-[14px] muted truncate">
-              {client.company ?? 'No company'}
-              {client.country ? ` · ${client.country}` : ''}
-            </p>
+      <PageHeading
+        eyebrow="Client record"
+        title={client.name}
+        description={`${client.company ?? 'No company'}${client.country ? ` · ${client.country}` : ''}`}
+        actions={(
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+            <StageBadge
+              stage={client.stage}
+              label={STAGE_LABELS[client.stage as keyof typeof STAGE_LABELS] ?? client.stage}
+            />
+            <Link className="btn btn-quiet btn-small" href={`/clients/${client.id}/edit`}>Edit details</Link>
+            <Link className="btn btn-quiet btn-small" href={`/search?q=${encodeURIComponent(client.name)}`}>Find messages</Link>
           </div>
-          <StageBadge
-            stage={client.stage}
-            label={STAGE_LABELS[client.stage as keyof typeof STAGE_LABELS] ?? client.stage}
-          />
-        </div>
+        )}
+      />
 
+      <section className="card p-4 sm:p-5">
         <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-[13px] sm:grid-cols-4">
           <div>
             <dt className="text-ink-faint">Deal value</dt>
@@ -127,14 +127,6 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
           </div>
         )}
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Link className="btn btn-quiet btn-small" href={`/clients/${client.id}/edit`}>
-            Edit details
-          </Link>
-          <Link className="btn btn-quiet btn-small" href={`/search?q=${encodeURIComponent(client.name)}`}>
-            Find messages
-          </Link>
-        </div>
       </section>
 
       {/* Start a thread */}

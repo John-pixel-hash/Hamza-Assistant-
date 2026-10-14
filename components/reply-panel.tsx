@@ -1,20 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { useActionState } from 'react';
+import { useActionState, useEffect, useRef, useState } from 'react';
 
 import { draftReplyAction, saveSentAction } from '@/app/actions/drafts';
 import { EMPTY_DRAFT_STATE, type DraftState, type SaveSentState } from '@/lib/ai/draft-state';
-
-/**
- * The reply panel: paste what the client sent, get a draft, edit it, keep it.
- *
- * Built for a phone first. The draft arrives in a text box rather than as
- * finished text, because a draft he cannot adjust is a draft he will not trust.
- *
- * The activity line matters: a real draft takes 6 to 18 seconds. Silence for
- * that long reads as broken, so the panel says what it is doing.
- */
 
 const CHANNELS = [
   { value: 'instagram', label: 'Instagram' },
@@ -27,7 +16,7 @@ const CHANNELS = [
 ];
 
 const TONES = [
-  { value: 'unknown', label: 'Work it out' },
+  { value: 'unknown', label: 'Use their tone' },
   { value: 'casual', label: 'Casual' },
   { value: 'formal', label: 'Formal' },
   { value: 'short', label: 'Short' },
@@ -43,15 +32,13 @@ function CopyButton({ text }: { text: string }) {
 
   return (
     <button
-      className="btn btn-quiet"
+      className="btn btn-quiet btn-small"
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(text);
           setCopied(true);
           window.setTimeout(() => setCopied(false), 2500);
         } catch {
-          // Clipboard access can be refused. The text box is still selectable,
-          // so this is a convenience failing, not the feature failing.
           setCopied(false);
         }
       }}
@@ -74,6 +61,7 @@ export function ReplyPanel({
   const [draftState, draftAction, drafting] = useActionState(draftReplyAction, EMPTY_DRAFT_STATE);
   const [saveState, saveAction, saving] = useActionState(saveSentAction, SAVE_SENT_INITIAL);
   const [slowDraft, setSlowDraft] = useState(false);
+  const [showIncoming, setShowIncoming] = useState(!lastClientMessage);
   const retrying = drafting && Boolean(draftState.error);
 
   useEffect(() => {
@@ -88,14 +76,10 @@ export function ReplyPanel({
 
   const [incoming, setIncoming] = useState('');
   const [channel, setChannel] = useState(
-    CHANNELS.some((c) => c.value === defaultChannel) ? defaultChannel : 'instagram',
+    CHANNELS.some((item) => item.value === defaultChannel) ? defaultChannel : 'instagram',
   );
   const [tone, setTone] = useState('unknown');
   const [text, setText] = useState('');
-
-  // Paste a client message and the lite model reads its tone, then preselects
-  // it here, unless he has already picked one himself. A courtesy, not a gate:
-  // the draft reads the tone from the thread either way.
   const [detectedTone, setDetectedTone] = useState<string | null>(null);
   const toneTouched = useRef(false);
 
@@ -117,15 +101,12 @@ export function ReplyPanel({
         setDetectedTone(read);
         if (!toneTouched.current) setTone(read);
       } catch {
-        // The tone read failing must never break the panel.
+        // Tone detection is optional and must never block a reply.
       }
     }, 600);
     return () => window.clearTimeout(handle);
   }, [incoming]);
 
-  // When a new draft arrives it goes into the editable box. Adjusting state
-  // during render is the documented React pattern for a value derived from a
-  // changing source, and it means the box never shows a stale draft.
   const shownDraft = draftState.draft ?? '';
   const [loadedDraft, setLoadedDraft] = useState('');
   if (shownDraft !== '' && shownDraft !== loadedDraft) {
@@ -134,106 +115,126 @@ export function ReplyPanel({
   }
 
   return (
-    <section className="card mt-4 p-4" aria-busy={drafting}>
-      <div className="flex items-baseline justify-between">
-        <h2 className="h2">Write a reply</h2>
+    <section className="card mt-4 p-4 sm:p-5" aria-busy={drafting} aria-labelledby="reply-panel-title">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <p className="eyebrow">Reply</p>
+          <h2 id="reply-panel-title" className="h2 mt-1">Write a reply</h2>
+        </div>
         {draftState.attempts > 0 && !drafting && (
           <span className="text-[12px] text-ink-faint">
-            {draftState.attempts === 1 ? 'first attempt' : 'repaired once'} ·{' '}
+            {draftState.attempts === 1 ? 'First attempt' : 'Repaired once'} ·{' '}
             {(draftState.latencyMs / 1000).toFixed(1)}s
             {draftState.modelId ? ` · ${draftState.modelId.replace('gemini-', '')}` : ''}
           </span>
         )}
       </div>
 
-      <p className="mt-1 text-[13px] muted">
-        Paste what they sent, or leave it empty to reply to the last message in the thread.
-      </p>
-
-      {lastClientMessage && (
-        <p className="mt-2 rounded-lg border border-line bg-surface p-3 text-[13px] text-ink-soft">
-          <span className="font-medium">Last from them: </span>
-          {lastClientMessage.length > 180
-            ? `${lastClientMessage.slice(0, 180)}...`
-            : lastClientMessage}
+      {lastClientMessage ? (
+        <div className="mt-3 rounded-xl border border-line bg-canvas p-3">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-ink-faint">Latest from client</p>
+          <p className="mt-1 whitespace-pre-wrap break-words text-[14px] text-ink-soft">
+            {lastClientMessage.length > 240 ? `${lastClientMessage.slice(0, 240)}...` : lastClientMessage}
+          </p>
+        </div>
+      ) : (
+        <p className="mt-2 text-[13px] text-ink-soft">
+          There is no client message saved yet. Paste one below to give the draft context.
         </p>
       )}
 
       <form action={draftAction} className="mt-3">
         <input name="thread_id" type="hidden" value={threadId} />
 
-        <label className="label" htmlFor="incoming">
-          What the client sent
-        </label>
-        <textarea
-          className="field mt-1"
-          id="incoming"
-          name="incoming"
-          onChange={(event) => setIncoming(event.target.value)}
-          placeholder="Paste their message here. Or keep it blank to use the thread history."
-          rows={3}
-          value={incoming}
-        />
-
-        <div className="mt-3 grid grid-cols-2 gap-3">
+        {(showIncoming || !lastClientMessage) ? (
           <div>
-            <label className="label" htmlFor="channel">
-              Platform
+            <label className="label" htmlFor="incoming">
+              {lastClientMessage ? 'Use a different message' : 'What the client sent'}
             </label>
-            <select
-              className="field mt-1"
-              id="channel"
-              name="channel"
-              onChange={(event) => setChannel(event.target.value)}
-              value={channel}
-            >
-              {CHANNELS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            <textarea
+              className="field"
+              id="incoming"
+              name="incoming"
+              onChange={(event) => setIncoming(event.target.value)}
+              placeholder="Paste a message here. Leave it blank to use the thread history."
+              rows={2}
+              value={incoming}
+            />
           </div>
-          <div>
-            <label className="label" htmlFor="tone">
-              Their tone
-            </label>
-            <select
-              className="field mt-1"
-              id="tone"
-              name="tone"
-              onChange={(event) => {
-                toneTouched.current = true;
-                setTone(event.target.value);
-              }}
-              value={tone}
-            >
-              {TONES.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            {detectedTone && detectedTone !== 'unknown' && (
-              <p className="mt-1 text-[12px] text-ink-faint">
-                {toneTouched.current
-                  ? `read as ${detectedTone}, you chose ${tone}`
-                  : 'read from their message'}
-              </p>
-            )}
-          </div>
-        </div>
+        ) : (
+          <input name="incoming" type="hidden" value="" />
+        )}
 
-        <label className="label mt-3" htmlFor="instruction">
-          Anything I should know (optional)
-        </label>
-        <input
-          className="field mt-1"
-          id="instruction"
-          name="instruction"
-          placeholder="For example: he is sensitive about price, or mention the deadline"
-          type="text"
-        />
+        {lastClientMessage && (
+          <button
+            type="button"
+            className="mt-2 min-h-10 text-[13px] font-semibold text-brand-ink underline decoration-brand/40 underline-offset-4"
+            onClick={() => {
+              const next = !showIncoming;
+              if (!next) {
+                setIncoming('');
+                setDetectedTone(null);
+                if (!toneTouched.current) setTone('unknown');
+              }
+              setShowIncoming(next);
+            }}
+            aria-expanded={showIncoming}
+          >
+            {showIncoming ? 'Use the latest saved message' : 'Reply to a different message'}
+          </button>
+        )}
+
+        <details className="disclosure mt-3 rounded-xl border border-line">
+          <summary>Adjust platform, tone, or instructions</summary>
+          <div className="grid grid-cols-1 gap-3 border-t border-line p-3 min-[390px]:grid-cols-2">
+            <div>
+              <label className="label" htmlFor="channel">Platform</label>
+              <select
+                className="field"
+                id="channel"
+                name="channel"
+                onChange={(event) => setChannel(event.target.value)}
+                value={channel}
+              >
+                {CHANNELS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label" htmlFor="tone">Their tone</label>
+              <select
+                className="field"
+                id="tone"
+                name="tone"
+                onChange={(event) => {
+                  toneTouched.current = true;
+                  setTone(event.target.value);
+                }}
+                value={tone}
+              >
+                {TONES.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+              {detectedTone && detectedTone !== 'unknown' && (
+                <p className="mt-1 text-[12px] text-ink-faint" aria-live="polite">
+                  {toneTouched.current ? `Detected ${detectedTone}. You selected ${tone}.` : `Detected ${detectedTone}.`}
+                </p>
+              )}
+            </div>
+            <div className="min-[390px]:col-span-2">
+              <label className="label" htmlFor="instruction">Extra guidance (optional)</label>
+              <input
+                className="field"
+                id="instruction"
+                name="instruction"
+                placeholder="For example, mention the deadline"
+                type="text"
+              />
+            </div>
+          </div>
+        </details>
 
         <button
           className={`btn btn-primary mt-3 w-full ${drafting ? 'btn-busy' : ''}`}
@@ -241,12 +242,7 @@ export function ReplyPanel({
           type="submit"
         >
           {drafting && (
-            <svg
-              aria-hidden="true"
-              className="h-4 w-4 animate-spin"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
+            <svg aria-hidden="true" className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
               <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.35" strokeWidth="3" />
               <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeLinecap="round" strokeWidth="3" />
             </svg>
@@ -259,12 +255,12 @@ export function ReplyPanel({
                 : 'Writing your draft...'
             : 'Draft the reply'}
         </button>
-        <p className="mt-2 text-[12px] text-ink-faint" aria-live="polite" aria-atomic="true">
+        <p id="draft-help" className="mt-2 text-[13px] text-ink-faint" role="status" aria-live="polite" aria-atomic="true">
           {drafting
             ? slowDraft
-              ? 'Taking longer than usual. Your message is still here, and nothing is saved until you choose.'
+              ? 'Taking longer than usual. Nothing is saved until you choose.'
               : 'Reading the thread and writing your reply.'
-            : 'Takes ten to twenty seconds, because it reads the whole thread first.'}
+            : 'Usually takes 6 to 18 seconds. Nothing is sent automatically.'}
         </p>
       </form>
 
@@ -277,29 +273,25 @@ export function ReplyPanel({
       {draftState.draft && !drafting && (
         <div className="mt-4 border-t border-line pt-4">
           {draftState.fixed && draftState.ok && (
-            <p className="mb-2 text-[12px] text-ink-faint">
-              The first attempt broke a rule, so it was written again. This one is clean.
+            <p className="mb-2 text-[13px] text-ink-faint">
+              I adjusted the first draft to meet the reply checks. Review this version before sending.
             </p>
           )}
           {!draftState.ok && draftState.problems.length > 0 && (
-            <div className="alert alert-warn mb-2" role="alert">
-              <p className="font-medium">Read this one before sending it.</p>
-              <ul className="mt-1 list-disc pl-4 text-[13px]">
-                {draftState.problems.map((problem) => (
-                  <li key={problem}>{problem}</li>
-                ))}
+            <div className="alert alert-warn mb-3" role="alert">
+              <p className="font-semibold">Review these points before sending</p>
+              <ul className="mt-1 list-disc pl-5 text-[13px]">
+                {draftState.problems.map((problem) => <li key={problem}>{problem}</li>)}
               </ul>
             </div>
           )}
 
-          <div className="flex items-baseline justify-between">
-            <label className="label" htmlFor="sent">
-              The draft, ready to edit
-            </label>
+          <div className="flex items-center justify-between gap-3">
+            <label className="label mb-0" htmlFor="sent">Draft reply</label>
             <CopyButton text={text} />
           </div>
           <textarea
-            className="field mt-1"
+            className="field mt-2"
             id="sent"
             onChange={(event) => setText(event.target.value)}
             rows={5}
@@ -320,18 +312,14 @@ export function ReplyPanel({
               disabled={saving || text.trim().length < 2}
               type="submit"
             >
-              {saving ? 'Saving...' : 'I sent this, save it to the thread'}
+              {saving ? 'Saving...' : 'I sent it, save to thread'}
             </button>
           </form>
 
-          {saveState.error && (
-            <div className="alert alert-warn mt-2" role="alert">
-              {saveState.error}
-            </div>
-          )}
+          {saveState.error && <div className="alert alert-warn mt-2" role="alert">{saveState.error}</div>}
           {saveState.saved && (
-            <p className="mt-2 text-[13px] text-ink-soft">
-              Saved. It is on the thread now, so the next draft knows what you said.
+            <p className="mt-2 text-[13px] text-brand-ink" role="status">
+              Saved to the thread. The next draft will use it as context.
             </p>
           )}
         </div>

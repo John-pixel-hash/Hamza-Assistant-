@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { PageHeading } from '@/components/page-heading';
 import { ProjectControls } from '@/components/project-controls';
 import { ProjectQuestions } from '@/components/project-questions';
 import { ProjectSteps } from '@/components/project-steps';
@@ -34,39 +35,34 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
   return (
     <>
-      <Link
-        className="text-[13px] font-medium text-brand"
-        href={project.client ? `/clients/${project.client.id}` : '/projects'}
-      >
+      <Link className="page-back-link" href={project.client ? `/clients/${project.client.id}` : '/projects'}>
         {project.client ? `Back to ${project.client.name}` : 'Back to projects'}
       </Link>
 
-      <header className="card mt-3 p-4">
-        <p className="eyebrow">{STATUS_LABEL[project.status] ?? project.status}</p>
-        <h1 className="h1 mt-1">{project.title}</h1>
-        <p className="mt-1 text-[13px] muted">
-          {project.client?.name ?? 'No client linked'}
-          {project.deadline
-            ? ` · due ${new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium' }).format(new Date(project.deadline))}`
-            : ' · no deadline set'}
-          {project.budget_amount
-            ? ` · ${(project.budget_amount / 100).toLocaleString('en-GB')} ${project.currency ?? 'USD'}`
-            : ''}
-        </p>
-        {project.steps.length > 0 && (
-          <div className="mt-3">
-            <div className="h-2 overflow-hidden rounded-full bg-line" role="presentation">
-              <div
-                className="h-full rounded-full bg-brand"
-                style={{ width: `${Math.round((doneSteps / project.steps.length) * 100)}%` }}
-              />
-            </div>
-            <p className="mt-1 text-[12px] text-ink-faint">
-              {doneSteps} of {project.steps.length} steps done
-            </p>
+      <PageHeading
+        eyebrow={STATUS_LABEL[project.status] ?? project.status}
+        title={project.title}
+        description={`${project.client?.name ?? 'No client linked'}${project.deadline
+          ? ` · Due ${new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium' }).format(new Date(project.deadline))}`
+          : ' · No deadline set'}${project.budget_amount
+          ? ` · ${(project.budget_amount / 100).toLocaleString('en-GB')} ${project.currency ?? 'USD'}`
+          : ''}`}
+      />
+
+      {project.steps.length > 0 && (
+        <section className="card mb-5 p-4" aria-label="Project progress">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[13px] font-semibold text-ink-soft">Progress</p>
+            <p className="text-[13px] text-ink-faint">{doneSteps} of {project.steps.length} steps complete</p>
           </div>
-        )}
-      </header>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-line" role="presentation">
+            <div
+              className="h-full rounded-full bg-brand"
+              style={{ width: `${Math.round((doneSteps / project.steps.length) * 100)}%` }}
+            />
+          </div>
+        </section>
+      )}
 
       {project.brief_json?.deadline_risk && (
         <div className="alert alert-warn mt-3" role="alert">

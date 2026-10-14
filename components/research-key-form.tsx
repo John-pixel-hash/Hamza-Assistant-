@@ -22,22 +22,22 @@ export function ResearchKeyForm({ hasStoredKey, hasEnvKey }: { hasStoredKey: boo
         </div>
       )}
       <p className="text-[14px] font-medium">Tavily research key</p>
-      <p className="mb-2 mt-0.5 text-[12px] text-ink-faint">
+      <p className="mb-3 mt-1 text-[13px] text-ink-faint">
         {hasStoredKey
-          ? 'A key is saved in your account.'
+          ? 'A key is saved securely for your account.'
           : hasEnvKey
-            ? 'Using the key from the server environment.'
-            : 'Not set yet. Free at app.tavily.com, about 1000 searches a month.'}
+            ? 'Using the server key.'
+            : 'Add a Tavily key to enable live research.'}
       </p>
-      <div className="flex gap-2">
+      <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
         <input
           name="tavily_key"
           type="password"
           autoComplete="off"
-          className="input flex-1"
+          className="field min-w-0 flex-1"
           placeholder="tvly-..."
         />
-        <button className="btn btn-primary shrink-0" type="submit" disabled={pending}>
+        <button className="btn btn-primary w-full shrink-0 sm:w-auto" type="submit" disabled={pending}>
           {pending ? 'Saving...' : 'Save'}
         </button>
       </div>

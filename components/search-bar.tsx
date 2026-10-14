@@ -16,12 +16,12 @@ export function SearchBar({
   hidden?: Record<string, string>;
 }) {
   return (
-    <form action={action} method="get" className="flex gap-2">
+    <form action={action} method="get" className="flex min-w-0 gap-2">
       {Object.entries(hidden).map(([key, value]) => (
         <input key={key} type="hidden" name={key} value={value} />
       ))}
       <input
-        className="field"
+        className="field min-w-0 flex-1"
         type="search"
         name="q"
         defaultValue={defaultValue}
@@ -29,7 +29,7 @@ export function SearchBar({
         aria-label={placeholder}
         enterKeyHint="search"
       />
-      <button className="btn btn-primary shrink-0 px-4" type="submit">
+      <button className="btn btn-primary min-w-[84px] shrink-0 px-4" type="submit">
         Search
       </button>
     </form>
@@ -62,7 +62,7 @@ export function StageFilter({
     <Link
       key={label}
       href={href}
-      className={`whitespace-nowrap rounded-full border px-3 py-1 text-[13px] font-medium ${
+      className={`flex min-h-[40px] shrink-0 items-center whitespace-nowrap rounded-full border px-3 py-1 text-[13px] font-medium ${
         active
           ? 'border-brand bg-brand text-white'
           : 'border-line-strong bg-surface text-ink-soft'
@@ -73,7 +73,7 @@ export function StageFilter({
   );
 
   return (
-    <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1">
+    <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0">
       {chip('All', build(undefined), !current)}
       {stages.map((stage) => chip(labels[stage] ?? stage, build(stage), current === stage))}
     </div>
