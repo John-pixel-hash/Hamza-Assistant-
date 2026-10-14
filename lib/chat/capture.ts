@@ -1,11 +1,18 @@
 import { revalidatePath } from 'next/cache';
 
 import { draftReply } from '@/lib/ai/draft';
-import { readConversationScreenshot } from '@/lib/ai/vision';
+import { readConversationScreenshots } from '@/lib/ai/vision';
 import type { Tone } from '@/lib/ai/voice';
 import { getClientDetail, getClientFacts } from '@/lib/data/clients';
 import { getClientProjectContext } from '@/lib/data/projects';
 import { getThread } from '@/lib/data/threads';
+import {
+  MAX_CHAT_BATCH_BYTES,
+  MAX_CHAT_IMAGE_BYTES,
+  MAX_CHAT_SCREENSHOTS,
+  mergeOverlappingMessages,
+  type ChatScreenshotUpload,
+} from '@/lib/chat/capture-core';
 import { dedupeKey, pickThread } from '@/lib/chat/threads';
 import { CHANNEL_LABELS, type Channel } from '@/lib/domain';
 import { createClient } from '@/lib/supabase/server';
@@ -13,7 +20,7 @@ import { createClient } from '@/lib/supabase/server';
 export type ChatCaptureResult = {
   ok: boolean;
   error?: string;
-  /** The screenshot had no visible name. The UI asks once, then retries. */
+  /** The screenshots had no visible name. The UI asks once, then retries. */
   needsName?: boolean;
   platform?: string;
   clientName?: string | null;
@@ -23,10 +30,17 @@ export type ChatCaptureResult = {
   createdClient?: boolean;
   addedMessages?: number;
   threadTitle?: string;
+  /** True once the screenshots are linked to saved thread messages. */
+  conversationSaved?: boolean;
+  uploads?: ChatScreenshotUpload[];
   extracted?: { role: string; text: string }[];
 };
 
 const TONES: Tone[] = ['casual', 'formal', 'short', 'detailed', 'warm', 'direct', 'unknown'];
+const SUPPORTED_IMAGE_MIMES = new Set(['image/png', 'image/jpeg', 'image/webp']);
+const CHAT_CAPTURE_DRAFT_DEADLINE_MS = 54000;
+const CHAT_CAPTURE_DRAFT_BUDGET_MS = 18000;
+const CHAT_CAPTURE_DRAFT_SETUP_RESERVE_MS = 3000;
 
 function asTone(value: string | null): Tone {
   if (!value) return 'unknown';
@@ -38,77 +52,123 @@ function normalise(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
+type LoadedScreenshot = {
+  upload: ChatScreenshotUpload;
+  bytes: Buffer;
+  mime: string;
+};
+
 /**
- * One screenshot in, one ready-to-copy reply out.
+ * An ordered screenshot set in, one ready-to-copy reply out.
  *
- * The whole chain: download the upload, read it with vision, match or create
- * the client, keep one thread per platform, save the client's messages with
- * the screenshot attached, run the memory pass, and draft the reply with the
- * same pipeline the reply panel uses.
+ * The whole chain: download the private uploads, read them as one conversation,
+ * match or create the client, keep one thread per platform, save messages and
+ * link each image to the messages it shows, then draft once from the combined
+ * history. The capture action keeps to a short model budget inside Vercel's
+ * 60-second Hobby serverless limit.
  */
-export async function captureChatScreenshot(
-  storagePath: string,
-  originalName: string,
-  clientNameOverride?: string | null,
+type CaptureProgress = {
+  conversationSaved: boolean;
+  clientId?: string;
+  clientName?: string;
+  createdClient?: boolean;
+  platform?: string;
+  threadId?: string;
+  threadTitle?: string;
+  addedMessages?: number;
+};
+
+async function captureChatScreenshotsInner(
+  uploads: ChatScreenshotUpload[],
+  clientNameOverride: string | null | undefined,
+  progress: CaptureProgress,
 ): Promise<ChatCaptureResult> {
+  const captureStartedAt = Date.now();
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: 'You are signed out. Sign in and try again.' };
 
-  if (!storagePath.startsWith(`${user.id}/`)) {
-    return { ok: false, error: 'That upload does not belong to this account.' };
+  if (uploads.length === 0 || uploads.length > MAX_CHAT_SCREENSHOTS) {
+    return { ok: false, error: `Choose between 1 and ${MAX_CHAT_SCREENSHOTS} screenshots.` };
+  }
+  if (uploads.some(({ path }) => !path.startsWith(`${user.id}/chat/`))) {
+    return { ok: false, error: 'That upload does not belong to this chat.' };
   }
 
-  const download = await supabase.storage.from('attachments').download(storagePath);
-  if (download.error || !download.data) {
-    return { ok: false, error: 'I could not open that screenshot. Upload it again.' };
-  }
-  const buffer = Buffer.from(await download.data.arrayBuffer());
-  const mime = download.data.type || 'image/png';
+  const loaded: LoadedScreenshot[] = [];
+  let totalBytes = 0;
+  for (const upload of uploads) {
+    const download = await supabase.storage.from('attachments').download(upload.path);
+    if (download.error || !download.data) {
+      return {
+        ok: false,
+        error: 'I could not open one of those screenshots. Check the image type and upload it again.',
+      };
+    }
 
-  const vision = await readConversationScreenshot({ bytes: buffer, mime });
+    const mime = (download.data.type || 'image/png').split(';')[0]?.toLowerCase() ?? 'image/png';
+    if (!SUPPORTED_IMAGE_MIMES.has(mime) || download.data.size === 0 || download.data.size > MAX_CHAT_IMAGE_BYTES) {
+      return {
+        ok: false,
+        error: 'I could not open one of those screenshots. Check the image type and upload it again.',
+      };
+    }
+    if (totalBytes + download.data.size > MAX_CHAT_BATCH_BYTES) {
+      return { ok: false, error: 'Those screenshots are too large together. Select a smaller set.' };
+    }
+
+    const bytes = Buffer.from(await download.data.arrayBuffer());
+    loaded.push({ upload, bytes, mime });
+    totalBytes += bytes.length;
+  }
+
+  const vision = await readConversationScreenshots(
+    loaded.map(({ bytes, mime }) => ({ bytes, mime })),
+  );
   if (!vision.extraction) {
     return {
       ok: false,
       error:
         vision.reason === 'unreadable'
-          ? 'I could not read a conversation in that screenshot. Try a clearer capture of the chat.'
-          : 'Every vision model is busy right now. Wait a minute and try again.',
+          ? 'I could not read a conversation in those screenshots. Try clearer captures of the chat.'
+          : 'I could not read those screenshots just now. Your selection is still here. Try again in a moment.',
     };
   }
-  const extraction = vision.extraction;
+  const extraction = {
+    ...vision.extraction,
+    messages: mergeOverlappingMessages(vision.extraction.messages),
+  };
 
-  const platform: Channel =
-    extraction.platform === 'unknown' ? 'other' : extraction.platform;
-
+  const platform: Channel = extraction.platform === 'unknown' ? 'other' : extraction.platform;
   const clientName = (clientNameOverride ?? extraction.clientName)?.trim() ?? null;
+  const uploadList = loaded.map(({ upload }) => upload);
   if (!clientName) {
     return {
       ok: false,
       needsName: true,
       platform,
       clientName: null,
-      extracted: extraction.messages.map((m) => ({ role: m.role, text: m.text })),
+      uploads: uploadList,
+      extracted: extraction.messages.map((message) => ({ role: message.role, text: message.text })),
     };
   }
 
   if (extraction.messages.length === 0) {
-    return { ok: false, error: 'I read the screenshot but found no client messages in it.' };
+    return { ok: false, error: 'I read the screenshots but found no messages in the conversation.' };
   }
 
   // Match an existing client before creating anything new.
   const wanted = normalise(clientName);
   const { data: clients } = await supabase.from('clients').select('id, name, channel');
   const all = (clients ?? []) as { id: string; name: string; channel: string | null }[];
-  let client = all.find((c) => normalise(c.name) === wanted) ?? null;
+  let client = all.find((candidate) => normalise(candidate.name) === wanted) ?? null;
   if (!client) {
-    client =
-      all.find((c) => {
-        const n = normalise(c.name);
-        return n.includes(wanted) || wanted.includes(n);
-      }) ?? null;
+    client = all.find((candidate) => {
+      const name = normalise(candidate.name);
+      return name.includes(wanted) || wanted.includes(name);
+    }) ?? null;
   }
 
   let clientId: string;
@@ -137,9 +197,8 @@ export async function captureChatScreenshot(
     createdClient = true;
   }
 
-  // Land on the conversation this screenshot continues: the freshest thread on
-  // the same platform. A second thread for one platform would split the story,
-  // so a new one is only created when none exists for that platform.
+  // Continue the freshest thread on this platform. This keeps the conversation
+  // whole and preserves the existing one-thread-per-platform guard.
   const { data: threadRows } = await supabase
     .from('threads')
     .select('id, title, updated_at')
@@ -183,59 +242,174 @@ export async function captureChatScreenshot(
     return { ok: false, error: 'I could not open a conversation thread. Try again.' };
   }
 
-  // The screenshot usually repeats the last saved lines. Skip anything the
-  // thread already contains so history never doubles, then save the new lines
-  // in order, screenshot attached to the first of them.
-  const { data: existingRows } = await supabase
+  // Keep existing duplicates, then add only genuinely new bubbles. Lists of
+  // ids preserve repeated text when the conversation intentionally contains
+  // the same short reply more than once.
+  const { data: existingRows, error: existingMessagesError } = await supabase
     .from('messages')
-    .select('role, content')
-    .eq('thread_id', threadId);
-  const seen = new Set(
-    ((existingRows ?? []) as { role: string; content: string }[]).map((row) =>
-      dedupeKey(row.role, row.content),
-    ),
-  );
-  const fresh = extraction.messages.filter(
-    (message) => !seen.has(dedupeKey(message.role, message.text)),
-  );
+    .select('id, role, content, sent_at, created_at')
+    .eq('thread_id', threadId)
+    .order('sent_at', { ascending: true })
+    .order('created_at', { ascending: true });
+  if (existingMessagesError) {
+    return { ok: false, error: 'I could not check the saved conversation. Try again.' };
+  }
 
-  let attachmentSaved = false;
-  for (const message of fresh) {
-    const { data: inserted, error } = await supabase
+  const messageIdsByKey = new Map<string, string[]>();
+  for (const row of (existingRows ?? []) as { id: string; role: string; content: string }[]) {
+    const key = dedupeKey(row.role, row.content);
+    messageIdsByKey.set(key, [...(messageIdsByKey.get(key) ?? []), row.id]);
+  }
+
+  const fresh = extraction.messages.filter(
+    (message) => !messageIdsByKey.has(dedupeKey(message.role, message.text)),
+  );
+  if (fresh.length > 0) {
+    const baseTime = Date.now();
+    const { data: insertedMessages, error } = await supabase
       .from('messages')
-      .insert({
+      .insert(fresh.map((message, index) => ({
         user_id: user.id,
         thread_id: threadId,
         role: message.role,
         content: message.text,
         channel: platform,
-        sent_at: new Date().toISOString(),
-      })
-      .select('id')
-      .single();
-    if (error || !inserted) {
+        sent_at: new Date(baseTime + index).toISOString(),
+      })))
+      .select('id, role, content, sent_at');
+    if (error || !insertedMessages || insertedMessages.length !== fresh.length) {
       return { ok: false, error: 'I could not save the conversation. Try again.' };
     }
-    if (!attachmentSaved) {
-      await supabase.from('attachments').insert({
-        user_id: user.id,
-        message_id: inserted.id,
-        client_id: clientId,
-        storage_path: storagePath,
-        original_name: originalName,
-        size_bytes: buffer.length,
-        kind: 'image',
-      });
-      attachmentSaved = true;
+    const chronologicalInsertions = (insertedMessages as {
+      id: string;
+      role: string;
+      content: string;
+      sent_at: string;
+    }[]).sort((a, b) => a.sent_at.localeCompare(b.sent_at));
+    for (const row of chronologicalInsertions) {
+      const key = dedupeKey(row.role, row.content);
+      messageIdsByKey.set(key, [...(messageIdsByKey.get(key) ?? []), row.id]);
     }
   }
-  const addedMessages = fresh.length;
 
+  const occurrenceByKey = new Map<string, number>();
+  const messageIdsByExtractionIndex = extraction.messages.map((message) => {
+    const key = dedupeKey(message.role, message.text);
+    const occurrence = occurrenceByKey.get(key) ?? 0;
+    occurrenceByKey.set(key, occurrence + 1);
+    const ids = messageIdsByKey.get(key) ?? [];
+    return ids.length > 0 ? ids[Math.min(occurrence, ids.length - 1)] ?? null : null;
+  });
+
+  progress.clientId = clientId;
+  progress.clientName = clientName;
+  progress.createdClient = createdClient;
+  progress.platform = platform;
+  progress.threadId = threadId;
+  progress.threadTitle = threadTitle;
+  progress.addedMessages = fresh.length;
+
+  const attachmentRows: {
+    user_id: string;
+    message_id: string;
+    client_id: string;
+    storage_path: string;
+    original_name: string;
+    size_bytes: number;
+    kind: 'image';
+  }[] = [];
+  const attachmentMessageIds = [...new Set(
+    messageIdsByExtractionIndex.filter((id): id is string => Boolean(id)),
+  )];
+  const linked = new Set<string>();
+  if (attachmentMessageIds.length > 0) {
+    const { data: existingAttachments, error } = await supabase
+      .from('attachments')
+      .select('message_id, storage_path')
+      .in('message_id', attachmentMessageIds)
+      .in('storage_path', loaded.map((image) => image.upload.path));
+    if (error) {
+      console.error('[chat] attachment lookup failed', error.message);
+      return {
+        ok: false,
+        error: 'I saved the conversation, but could not check its screenshot links. Try again to finish.',
+        ...progress,
+        uploads: uploadList,
+        extracted: extraction.messages.map((message) => ({ role: message.role, text: message.text })),
+      };
+    }
+    for (const row of existingAttachments ?? []) {
+      if (row.message_id && row.storage_path) {
+        linked.add(`${row.message_id}:${row.storage_path}`);
+      }
+    }
+  }
+  for (const [messageIndex, message] of extraction.messages.entries()) {
+    const messageId = messageIdsByExtractionIndex[messageIndex];
+    if (!messageId) continue;
+    const indices = message.screenshotIndices.filter((index) => index >= 0 && index < loaded.length);
+    for (const index of indices) {
+      const image = loaded[index];
+      if (!image) continue;
+      const key = `${messageId}:${image.upload.path}`;
+      if (linked.has(key)) continue;
+      linked.add(key);
+      attachmentRows.push({
+        user_id: user.id,
+        message_id: messageId,
+        client_id: clientId,
+        storage_path: image.upload.path,
+        original_name: image.upload.name,
+        size_bytes: image.bytes.length,
+        kind: 'image',
+      });
+    }
+  }
+
+  if (attachmentRows.length > 0) {
+    // If the storage write succeeds but the response is interrupted, protect
+    // the uploaded files from being deleted by a later selection edit.
+    progress.conversationSaved = true;
+    const { error } = await supabase.from('attachments').insert(attachmentRows);
+    if (error) {
+      progress.conversationSaved = false;
+      console.error('[chat] attachment links failed', error.message);
+      return {
+        ok: false,
+        error: 'I saved the conversation, but could not link its screenshots. Try again to finish.',
+        ...progress,
+        uploads: uploadList,
+        extracted: extraction.messages.map((message) => ({ role: message.role, text: message.text })),
+      };
+    }
+  }
+  progress.conversationSaved = true;
+
+  const addedMessages = fresh.length;
+  const savedResult = {
+    platform,
+    clientName,
+    clientId,
+    threadId,
+    threadTitle,
+    createdClient,
+    addedMessages,
+    conversationSaved: true,
+    uploads: uploadList,
+    extracted: extraction.messages.map((message) => ({ role: message.role, text: message.text })),
+  };
   revalidatePath('/clients');
   revalidatePath(`/clients/${clientId}`);
+  revalidatePath(`/threads/${threadId}`);
 
-  const detail = await getThread(threadId);
-  if (!detail) return { ok: false, error: 'The thread disappeared while I was working.' };
+  const detail = await getThread(threadId, { withAttachments: false });
+  if (!detail) {
+    return {
+      ok: false,
+      error: 'The thread disappeared while I was working.',
+      ...savedResult,
+    };
+  }
   const [clientResult, facts, projects] = await Promise.all([
     getClientDetail(clientId),
     getClientFacts(clientId),
@@ -244,70 +418,113 @@ export async function captureChatScreenshot(
   const clientRow = clientResult.client;
 
   const tone = asTone(extraction.tone);
+  const remainingActionMs = CHAT_CAPTURE_DRAFT_DEADLINE_MS - (Date.now() - captureStartedAt);
+  const draftBudgetMs = Math.min(
+    CHAT_CAPTURE_DRAFT_BUDGET_MS,
+    remainingActionMs - CHAT_CAPTURE_DRAFT_SETUP_RESERVE_MS,
+  );
+  if (draftBudgetMs < 1000) {
+    return {
+      ok: false,
+      error: 'The conversation is saved, but I ran out of time to draft here. Open the saved thread to write the reply.',
+      ...savedResult,
+    };
+  }
 
-  // The reply is written from the message itself plus what was already known.
-  // The memory pass deliberately does NOT run here: it has its own route that
-  // the browser fires right after the reply lands, so the action stays inside
-  // the 60 second serverless budget.
+  // The memory pass deliberately does not run here. It has its own route that
+  // the browser fires right after the reply lands, keeping this action in the
+  // 60-second serverless time box.
   let draft;
   try {
     draft = await draftReply({
-        fast: true,
-    channel: platform,
-    tone,
-    purpose: 'reply',
-    instruction: null,
-    context: {
-      client: {
-        id: clientRow?.id ?? clientId,
-        name: clientRow?.name ?? clientName,
-        company: clientRow?.company ?? null,
-        country: clientRow?.country ?? null,
-        stage: clientRow?.stage ?? 'lead',
-        source: clientRow?.source ?? null,
-        channel: clientRow?.channel ?? platform,
-        currency: clientRow?.currency ?? null,
-        deal_value_estimate: clientRow?.deal_value_estimate ?? null,
-        summary: clientRow?.summary ?? null,
-        notes: clientRow?.notes ?? null,
-      },
-      thread: { id: detail.thread.id, title: detail.thread.title, mode: detail.thread.mode },
-      messages: detail.messages.map((message) => ({
-        role: message.role,
-        content: message.content,
-        sent_at: message.sent_at ?? message.created_at,
-        channel: message.channel,
-      })),
-      facts: facts.map((fact) => ({ key: fact.key, value: fact.value, confidence: fact.confidence })),
-      projects,
-      incoming: null,
+      fast: true,
+      budgetMs: draftBudgetMs,
+      attemptTimeoutMs: Math.min(10000, draftBudgetMs),
       channel: platform,
-    },
+      tone,
+      purpose: 'reply',
+      instruction: null,
+      context: {
+        client: {
+          id: clientRow?.id ?? clientId,
+          name: clientRow?.name ?? clientName,
+          company: clientRow?.company ?? null,
+          country: clientRow?.country ?? null,
+          stage: clientRow?.stage ?? 'lead',
+          source: clientRow?.source ?? null,
+          channel: clientRow?.channel ?? platform,
+          currency: clientRow?.currency ?? null,
+          deal_value_estimate: clientRow?.deal_value_estimate ?? null,
+          summary: clientRow?.summary ?? null,
+          notes: clientRow?.notes ?? null,
+        },
+        thread: { id: detail.thread.id, title: detail.thread.title, mode: detail.thread.mode },
+        messages: detail.messages.map((message) => ({
+          role: message.role,
+          content: message.content,
+          sent_at: message.sent_at ?? message.created_at,
+          channel: message.channel,
+        })),
+        facts: facts.map((fact) => ({ key: fact.key, value: fact.value, confidence: fact.confidence })),
+        projects,
+        incoming: null,
+        channel: platform,
+      },
     });
   } catch (error) {
     console.error('[chat] draft failed', error instanceof Error ? error.message : error);
     return {
       ok: false,
-      error:
-        'I saved the conversation, but every model is busy right now. Open the client and use the reply panel in a minute.',
+      error: 'I saved the conversation, but could not finish the reply just now. Open the saved thread and use its reply panel or try again.',
+      ...savedResult,
     };
   }
 
   const reply = draft.text.trim();
   if (!reply) {
-    return { ok: false, error: 'I saved the conversation but the reply came back empty. Open the thread and use the reply panel.' };
+    return {
+      ok: false,
+      error: 'I saved the conversation but the reply came back empty. Open the saved thread and use its reply panel.',
+      ...savedResult,
+    };
   }
 
-  return {
-    ok: true,
-    platform,
-    clientName,
-    reply,
-    clientId,
-    threadId,
-    threadTitle,
-    createdClient,
-    addedMessages,
-    extracted: extraction.messages.map((m) => ({ role: m.role, text: m.text })),
-  };
+  return { ok: true, reply, ...savedResult };
+}
+
+/** Convert unexpected network or provider failures into a recoverable form state. */
+export async function captureChatScreenshots(
+  uploads: ChatScreenshotUpload[],
+  clientNameOverride?: string | null,
+): Promise<ChatCaptureResult> {
+  const progress: CaptureProgress = { conversationSaved: false };
+  try {
+    return await captureChatScreenshotsInner(uploads, clientNameOverride, progress);
+  } catch (error) {
+    console.error('[chat] capture failed', error instanceof Error ? error.message : error);
+    return {
+      ok: false,
+      error: progress.conversationSaved
+        ? 'The conversation and screenshots were saved, but the reply could not be finished. Open Clients and use the reply panel.'
+        : 'I could not finish this capture. Your screenshots are still selected. Try again.',
+      conversationSaved: progress.conversationSaved,
+      clientId: progress.clientId,
+      clientName: progress.clientName,
+      createdClient: progress.createdClient,
+      platform: progress.platform,
+      threadId: progress.threadId,
+      threadTitle: progress.threadTitle,
+      addedMessages: progress.addedMessages,
+      uploads,
+    };
+  }
+}
+
+/** Backwards-compatible wrapper for older single-image callers. */
+export async function captureChatScreenshot(
+  storagePath: string,
+  originalName: string,
+  clientNameOverride?: string | null,
+): Promise<ChatCaptureResult> {
+  return captureChatScreenshots([{ path: storagePath, name: originalName }], clientNameOverride);
 }

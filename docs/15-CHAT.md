@@ -1,28 +1,53 @@
-# Chat: screenshot to reply
+# Chat: screenshots to reply
 
-One screen, two taps. Upload a screenshot of a client conversation from any
-platform and get back a ready to copy reply, with the conversation filed under
+One screen, two taps. Select up to 10 ordered screenshots from a client
+conversation and get one ready-to-copy reply, with the conversation filed under
 the right client.
 
 ## The flow
 
-1. The browser uploads the image straight to the private `attachments` bucket
-   under `{user_id}/chat/`, the same pipe the thread composer uses.
+1. The browser uploads each image straight to the private `attachments` bucket
+   under `{user_id}/chat/`. Images are limited to 8 MB each and 12 MB per set.
+   The combined limit leaves room for base64 encoding under Gemini's documented
+   20 MB inline-request limit (see [Image understanding](https://ai.google.dev/gemini-api/docs/generate-content/image-understanding)).
 2. One form post calls `chatCaptureAction`, which runs
-   `captureChatScreenshot` in `lib/chat/capture.ts`:
-   - download the image server side,
-   - read it with vision (`lib/ai/vision.ts`): platform, client name, who said
-     what, tone. Vision runs gemini-3.5-flash with automatic fallback to
-     gemini-3.1-flash-lite on 429/503, because the free tier spikes,
+   `captureChatScreenshots` in `lib/chat/capture.ts`:
+   - validate the ordered upload manifest and download the images server side,
+   - read the images together with vision (`lib/ai/vision.ts`) to identify the
+     platform, visible client name, message text, tone, and the screenshots
+     containing each message,
+   - use the configured free Gemini model chain only, with a 26-second vision
+     ceiling and a 12-second cap per model attempt,
    - match an existing client by normalised name (exact, then contained),
      create one only when there is no match,
-   - keep one thread per platform per client, titled like "Instagram chat",
-   - save the client's messages with the screenshot attached,
-   - run the memory pass so facts, the summary and embeddings update before
-     the reply is written,
-   - draft the reply with the same platform aware pipeline as the reply panel.
+   - continue the freshest thread on that platform, creating one only when
+     needed,
+   - save new messages and link each screenshot to the messages it shows,
+   - draft once from the combined thread on the fast free model. The provider
+     budget is capped at 18 seconds and shortens if earlier work takes longer,
+     leaving time before the 60-second Hobby limit.
 3. The result screen shows the reply with a Copy button, an Open client link,
-   and the extracted text in a details box so nothing is a black box.
+   and the extracted messages in conversation order. A separate request runs the
+   memory pass after a successful reply.
+
+The picker accepts PNG, JPEG, and WebP. Users can add images in multiple
+selections, review their order, move them earlier or later, and remove them
+before sending.
+
+## Multiple screenshots and overlap
+
+The vision prompt treats the selected images as one conversation in the order
+shown. It asks the model to return an overlapping bubble once and list every
+screenshot where that bubble appears. The server merges repeated bubbles as a
+second check, retains their source-image indices, and links the original image
+to each relevant saved message. If all messages already exist, the images can
+still be linked to that history. For a multi-image read, a message without a
+valid screenshot index is rejected instead of guessing which image it came from.
+
+Existing thread messages and existing image links are checked before writing.
+A retry does not create a second thread, duplicate an already-saved message, or
+add the same screenshot link twice. An unreadable batch creates no partial
+message writes.
 
 ## Appending to existing threads, without doubling
 
@@ -40,11 +65,13 @@ the one new line, second capture added zero, thread count stayed one.
 
 ## Deliberate fallbacks
 
-- No visible name in the screenshot: the same screen asks for the name once
-  and retries with the same upload. Nothing nameless is ever created.
-- Vision unreadable: a plain error, no partial writes.
-- Vision models busy: flash to lite fallback, then a "try again" message.
-- Every layer never throws, matching the rest of the app.
+- No visible name in the screenshots: the same screen asks for the name once
+  and retries with the same ordered set. Nothing nameless is ever created.
+- Vision unreadable: a plain error, no partial message writes.
+- Vision or draft model unavailable: try the other allowed free models. If the
+  draft still fails, keep the saved conversation and screenshots for the reply panel.
+- Unexpected capture failures return a recoverable form state instead of a
+  server-action crash.
 
 ## Entry points
 

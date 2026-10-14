@@ -9,8 +9,8 @@ import { classifyDraftError, isRetryableDraftError } from './draft-errors';
 import { DRAFT_FALLBACK_MODEL, modelChain, sleepMs } from './routing';
 
 // Drafts share the 60 second serverless window with everything else the
-// action does. New fallback attempts stop once 40 seconds are gone, and each
-// attempt is capped, so the repair pass still fits after a bad spike.
+// action does. The capture flow can request a shorter budget to leave time for
+// screenshot reading and saving; no caller can extend this hard limit.
 const DRAFT_BUDGET_MS = 40000;
 const DRAFT_ATTEMPT_TIMEOUT_MS = 14000;
 const DRAFT_BACKOFF_MS = 1500;
@@ -78,6 +78,14 @@ export async function draftReply(
   // Try the routed model first, then the other free-tier models on quota,
   // timeout, or transient provider errors. Do not spend extra attempts on a
   // permanent error such as an invalid request.
+  const requestedBudgetMs = typeof request.budgetMs === 'number' && Number.isFinite(request.budgetMs)
+    ? request.budgetMs
+    : DRAFT_BUDGET_MS;
+  const budgetMs = Math.max(1000, Math.min(DRAFT_BUDGET_MS, requestedBudgetMs));
+  const requestedAttemptTimeoutMs = typeof request.attemptTimeoutMs === 'number' && Number.isFinite(request.attemptTimeoutMs)
+    ? request.attemptTimeoutMs
+    : DRAFT_ATTEMPT_TIMEOUT_MS;
+  const attemptTimeoutMs = Math.max(1000, Math.min(DRAFT_ATTEMPT_TIMEOUT_MS, requestedAttemptTimeoutMs));
   const started = Date.now();
   let outcome: DraftOutcome | null = null;
   let lastError: unknown = null;
@@ -85,8 +93,9 @@ export async function draftReply(
 
   for (const [index, modelId] of modelChain(firstModelId).entries()) {
     if (index > 0) {
-      if (Date.now() - started > DRAFT_BUDGET_MS) break;
+      if (Date.now() - started + DRAFT_BACKOFF_MS >= budgetMs) break;
       await sleepMs(DRAFT_BACKOFF_MS);
+      if (Date.now() - started >= budgetMs) break;
       usedModel = modelFor({ ...resolved, modelId });
       usedResolved = {
         ...resolved,
@@ -98,7 +107,17 @@ export async function draftReply(
     }
     triedModels.push(modelId);
     try {
-      outcome = await draftReplyWith(aiSdkGenerator(usedModel, DRAFT_ATTEMPT_TIMEOUT_MS), request);
+      const generator: GenerateFn = async (input) => {
+        const remainingMs = budgetMs - (Date.now() - started);
+        if (remainingMs <= 0) {
+          const error = new Error('Draft provider time budget expired.');
+          error.name = 'TimeoutError';
+          throw error;
+        }
+        const timeoutMs = Math.max(1, Math.min(attemptTimeoutMs, Math.floor(remainingMs)));
+        return aiSdkGenerator(usedModel, timeoutMs)(input);
+      };
+      outcome = await draftReplyWith(generator, request);
       lastError = null;
       break;
     } catch (error) {

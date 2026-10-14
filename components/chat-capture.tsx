@@ -5,10 +5,35 @@ import { useActionState, useEffect, useRef, useState } from 'react';
 
 import { chatCaptureAction } from '@/app/actions/chat';
 import { EMPTY_CHAT_STATE } from '@/lib/chat/state';
+import {
+  MAX_CHAT_BATCH_BYTES,
+  MAX_CHAT_IMAGE_BYTES,
+  MAX_CHAT_SCREENSHOTS,
+  moveScreenshotAt,
+  type ChatScreenshotUpload,
+} from '@/lib/chat/capture-core';
 import { CHANNEL_LABELS, type Channel } from '@/lib/domain';
 import { createClient } from '@/lib/supabase/client';
 
-type UploadState = { uploading: boolean; path: string | null; name: string | null; error: string | null };
+type UploadedScreenshot = ChatScreenshotUpload & {
+  size: number;
+  previewUrl: string | null;
+  saved: boolean;
+};
+
+type UploadState = {
+  uploading: boolean;
+  uploadingCount: number;
+  uploaded: UploadedScreenshot[];
+  touched: boolean;
+  error: string | null;
+};
+
+const IMAGE_EXTENSIONS: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/webp': 'webp',
+};
 
 /**
  * A chat shaped screen, the way the big assistants do it: the conversation as
@@ -18,40 +43,214 @@ export function ChatCapture() {
   const [state, formAction, pending] = useActionState(chatCaptureAction, EMPTY_CHAT_STATE);
   const [upload, setUpload] = useState<UploadState>({
     uploading: false,
-    path: null,
-    name: null,
+    uploadingCount: 0,
+    uploaded: [],
+    touched: false,
     error: null,
   });
   const [copied, setCopied] = useState(false);
+  const [selectionChanged, setSelectionChanged] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const previewUrls = useRef(new Set<string>());
 
-  async function handleFiles(files: FileList | null) {
-    const file = files?.[0];
-    if (!file) return;
+  const selectedUploads: UploadedScreenshot[] = upload.touched
+    ? upload.uploaded
+    : (state.uploads ?? []).map((item) => ({
+        ...item,
+        size: 0,
+        previewUrl: null,
+        saved: state.conversationSaved === true,
+      }));
 
-    setUpload({ uploading: false, path: null, name: null, error: null });
-    setUpload({ uploading: true, path: null, name: null, error: null });
+  useEffect(() => () => {
+    for (const url of previewUrls.current) URL.revokeObjectURL(url);
+    previewUrls.current.clear();
+  }, []);
 
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      setUpload({ uploading: false, path: null, name: null, error: 'You are signed out. Sign in and try again.' });
-      return;
-    }
-
-    const extension = file.name.includes('.') ? file.name.split('.').pop() : 'png';
-    const path = `${user.id}/chat/${crypto.randomUUID()}.${extension}`;
-    const { error } = await supabase.storage.from('attachments').upload(path, file, {
-      contentType: file.type || 'image/png',
-      upsert: false,
+  // Once the server confirms the screenshot links are saved, never remove those
+  // private files just because the user edits the unsent selection.
+  useEffect(() => {
+    if (!state.conversationSaved) return;
+    setUpload((previous) => {
+      const items = previous.touched
+        ? previous.uploaded
+        : (state.uploads ?? []).map((item) => ({
+            ...item,
+            size: 0,
+            previewUrl: null,
+            saved: false,
+          }));
+      if (items.length === 0) return previous;
+      return {
+        ...previous,
+        touched: true,
+        uploaded: items.map((item) => ({ ...item, saved: true })),
+      };
     });
-    if (error) {
-      setUpload({ uploading: false, path: null, name: null, error: 'Upload failed. Check you are online and try again.' });
+  }, [state.conversationSaved, state.uploads]);
+
+  async function handleFiles(files: File[]) {
+    if (files.length === 0) return;
+    setSelectionChanged(true);
+
+    const existing = selectedUploads;
+    const availableSlots = MAX_CHAT_SCREENSHOTS - existing.length;
+    if (files.length > availableSlots) {
+      setUpload((previous) => ({
+        ...previous,
+        error: `You can select up to ${MAX_CHAT_SCREENSHOTS} screenshots in one capture. Remove one before adding more.`,
+      }));
       return;
     }
-    setUpload({ uploading: false, path, name: file.name, error: null });
+
+    if (files.some((file) => !IMAGE_EXTENSIONS[file.type])) {
+      setUpload((previous) => ({
+        ...previous,
+        error: 'Choose PNG, JPEG, or WebP screenshots.',
+      }));
+      return;
+    }
+    if (files.some((file) => file.size === 0 || file.size > MAX_CHAT_IMAGE_BYTES)) {
+      setUpload((previous) => ({
+        ...previous,
+        error: 'Each screenshot must be 8 MB or less.',
+      }));
+      return;
+    }
+    const currentBytes = existing.reduce((sum, item) => sum + item.size, 0);
+    const newBytes = files.reduce((sum, file) => sum + file.size, 0);
+    if (currentBytes + newBytes > MAX_CHAT_BATCH_BYTES) {
+      setUpload((previous) => ({
+        ...previous,
+        error: 'Keep the screenshots under 12 MB in total.',
+      }));
+      return;
+    }
+
+    const preserved = existing.map((item) => ({ ...item }));
+    setUpload((previous) => ({
+      ...previous,
+      uploading: true,
+      uploadingCount: files.length,
+      uploaded: preserved,
+      touched: true,
+      error: null,
+    }));
+
+    try {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setUpload((previous) => ({
+          ...previous,
+          uploading: false,
+          uploadingCount: 0,
+          error: 'You are signed out. Sign in and try again.',
+        }));
+        return;
+      }
+
+      const results = await Promise.all(files.map(async (file) => {
+        const extension = IMAGE_EXTENSIONS[file.type] ?? 'png';
+        const path = `${user.id}/chat/${crypto.randomUUID()}.${extension}`;
+        const { error } = await supabase.storage.from('attachments').upload(path, file, {
+          contentType: file.type,
+          upsert: false,
+        });
+        return { file, path, error };
+      }));
+
+      if (results.some((result) => result.error)) {
+        const successfulPaths = results.filter((result) => !result.error).map((result) => result.path);
+        if (successfulPaths.length > 0) {
+          await supabase.storage.from('attachments').remove(successfulPaths);
+        }
+        setUpload((previous) => ({
+          ...previous,
+          uploading: false,
+          uploadingCount: 0,
+          error: 'One or more screenshots failed to upload. Nothing new was added. Try again.',
+        }));
+        return;
+      }
+
+      const additions = results.map(({ file, path }) => {
+        const previewUrl = URL.createObjectURL(file);
+        previewUrls.current.add(previewUrl);
+        return {
+          path,
+          name: file.name,
+          size: file.size,
+          previewUrl,
+          saved: false,
+        };
+      });
+      setUpload((previous) => ({
+        ...previous,
+        uploading: false,
+        uploadingCount: 0,
+        uploaded: [...previous.uploaded, ...additions],
+        touched: true,
+        error: null,
+      }));
+    } catch {
+      setUpload((previous) => ({
+        ...previous,
+        uploading: false,
+        uploadingCount: 0,
+        error: 'Upload failed. Check you are online and try again.',
+      }));
+    }
+  }
+
+  function moveScreenshot(index: number, direction: -1 | 1) {
+    setSelectionChanged(true);
+    const target = index + direction;
+    if (target < 0 || target >= selectedUploads.length) return;
+    const reordered = moveScreenshotAt(selectedUploads, index, direction);
+    setUpload((previous) => ({
+      ...previous,
+      uploaded: reordered,
+      touched: true,
+      error: null,
+    }));
+  }
+
+  async function removeScreenshot(index: number) {
+    setSelectionChanged(true);
+    const item = selectedUploads[index];
+    if (!item) return;
+    if (item.previewUrl) {
+      URL.revokeObjectURL(item.previewUrl);
+      previewUrls.current.delete(item.previewUrl);
+    }
+    const remaining = selectedUploads.filter((_, itemIndex) => itemIndex !== index);
+    setUpload((previous) => ({
+      ...previous,
+      uploaded: remaining,
+      touched: true,
+      error: null,
+    }));
+
+    if (!item.saved) {
+      try {
+        const supabase = createClient();
+        const { error } = await supabase.storage.from('attachments').remove([item.path]);
+        if (error) {
+          setUpload((previous) => ({
+            ...previous,
+            error: 'Screenshot removed from the selection, but its private upload could not be deleted.',
+          }));
+        }
+      } catch {
+        setUpload((previous) => ({
+          ...previous,
+          error: 'Screenshot removed from the selection, but its private upload could not be deleted.',
+        }));
+      }
+    }
   }
 
   async function copyReply() {
@@ -80,17 +279,14 @@ export function ChatCapture() {
     state.platform && state.platform !== 'unknown'
       ? CHANNEL_LABELS[state.platform as Channel] ?? state.platform
       : 'Unknown platform';
-
-  const clientBubbles = state.extracted?.filter((line) => line.role === 'client') ?? [];
-  const myBubbles = state.extracted?.filter((line) => line.role === 'me') ?? [];
-  const hasConversation = state.ok || clientBubbles.length > 0 || Boolean(state.needsName);
+  const hasConversation = state.ok || Boolean(state.extracted?.length) || Boolean(state.needsName);
 
   return (
     <div className="flex min-h-[62vh] flex-col justify-end">
       {!hasConversation && (
         <p className="mb-4 text-center text-[13px] text-ink-faint">
-          Tap the plus, pick a screenshot of the chat, and send. I read it and
-          answer as a message you can copy.
+          Pick up to 10 screenshots in conversation order. Reorder or remove them
+          before sending. I will read them together and write one reply you can copy.
         </p>
       )}
 
@@ -128,16 +324,13 @@ export function ChatCapture() {
       )}
 
       <div className="space-y-3">
-        {clientBubbles.map((line, index) => (
-          <div key={`c${index}`} className="flex justify-start">
-            <p className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-bl-md bg-line px-4 py-2.5 text-[14px]">
-              {line.text}
-            </p>
-          </div>
-        ))}
-        {myBubbles.map((line, index) => (
-          <div key={`m${index}`} className="flex justify-end">
-            <p className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-brand px-4 py-2.5 text-[14px] text-white">
+        {state.extracted?.map((line, index) => (
+          <div key={`message-${index}`} className={`flex ${line.role === 'client' ? 'justify-start' : 'justify-end'}`}>
+            <p className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-[14px] ${
+              line.role === 'client'
+                ? 'rounded-bl-md bg-line'
+                : 'rounded-br-md bg-brand text-white'
+            }`}>
               {line.text}
             </p>
           </div>
@@ -145,8 +338,10 @@ export function ChatCapture() {
 
         {pending && (
           <div className="flex justify-end">
-            <p className="rounded-2xl rounded-br-md bg-brand/10 px-4 py-2.5 text-[13px] text-ink-faint">
-              Reading and writing...
+            <p className="rounded-2xl rounded-br-md bg-brand/10 px-4 py-2.5 text-[13px] text-ink-faint" role="status">
+              {selectedUploads.length > 0
+                ? `Reading ${selectedUploads.length} screenshot${selectedUploads.length === 1 ? '' : 's'} and writing...`
+                : 'Reading the conversation and writing...'}
             </p>
           </div>
         )}
@@ -168,10 +363,7 @@ export function ChatCapture() {
               <button
                 className="btn btn-quiet btn-small"
                 type="button"
-                onClick={() => {
-                  setUpload({ uploading: false, path: null, name: null, error: null });
-                  if (fileRef.current) fileRef.current.value = '';
-                }}
+                onClick={() => window.location.reload()}
               >
                 New chat
               </button>
@@ -180,77 +372,176 @@ export function ChatCapture() {
         )}
       </div>
 
-      <form
-        action={async (formData: FormData) => {
-          setCopied(false);
-          await formAction(formData);
-        }}
-        className="card mt-4 rounded-3xl p-3"
-      >
-        {state.error && !state.needsName && (
-          <div className="alert alert-error mb-2" role="alert">
-            {state.error}
-          </div>
-        )}
-        {upload.error && (
-          <div className="alert alert-error mb-2" role="alert">
-            {upload.error}
-          </div>
-        )}
-        {state.needsName && (
-          <label className="mb-2 block text-[13px] font-semibold" htmlFor="chat-client-name">
-            I read the chat but the name is not visible. Who is this?
+      {!state.ok && (
+        <form
+          action={async (formData: FormData) => {
+            setCopied(false);
+            setSelectionChanged(false);
+            await formAction(formData);
+          }}
+          className="card mt-4 rounded-3xl p-3"
+        >
+          {state.error && !state.needsName && !pending && !selectionChanged && (
+            <div className="alert alert-error mb-2" role="alert">
+              {state.error}
+            </div>
+          )}
+          {!state.ok && state.threadId && !pending && (
+            <div className="mb-2 flex flex-wrap gap-2">
+              <Link className="btn btn-quiet btn-small" href={`/threads/${state.threadId}`}>
+                Open conversation
+              </Link>
+              {state.clientId && (
+                <Link className="btn btn-quiet btn-small" href={`/clients/${state.clientId}`}>
+                  Open client
+                </Link>
+              )}
+            </div>
+          )}
+          {upload.error && !pending && (
+            <div className="alert alert-error mb-2" role="alert">
+              {upload.error}
+            </div>
+          )}
+          {state.needsName && (
+            <label className="mb-2 block text-[13px] font-semibold" htmlFor="chat-client-name">
+              I read the chat but the name is not visible. Who is this?
+              <input
+                id="chat-client-name"
+                name="client_name"
+                type="text"
+                required
+                className="input mt-1"
+                placeholder="Client name"
+              />
+            </label>
+          )}
+
+          {selectedUploads.length > 0 && (
+            <div className="mb-3">
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <p className="text-[12px] font-medium text-ink-soft">
+                  {selectedUploads.length} of {MAX_CHAT_SCREENSHOTS} screenshots
+                </p>
+                <p className="text-[11px] text-ink-faint">Reorder or remove</p>
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Selected screenshots">
+                {selectedUploads.map((item, index) => (
+                  <div key={item.path} className="w-24 shrink-0 rounded-xl border border-line bg-surface p-1.5">
+                    {item.previewUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={item.previewUrl}
+                        alt={`Screenshot ${index + 1}`}
+                        className="h-16 w-full rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-16 items-center justify-center rounded-lg bg-line text-[11px] text-ink-faint">
+                        Image {index + 1}
+                      </div>
+                    )}
+                    <p className="mt-1 truncate text-[10px] text-ink-faint" title={item.name}>
+                      {index + 1}. {item.name}
+                    </p>
+                    <div className="mt-1 flex items-center justify-between">
+                      <button
+                        type="button"
+                        onClick={() => moveScreenshot(index, -1)}
+                        disabled={index === 0 || pending || upload.uploading}
+                        aria-label={`Move screenshot ${index + 1} earlier`}
+                        title="Move earlier"
+                        className="flex h-7 w-7 items-center justify-center rounded-full text-ink-soft disabled:opacity-30"
+                      >
+                        <svg aria-hidden viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
+                          <path d="m12 5-7 7 1.4 1.4 4.6-4.6V20h2V8.8l4.6 4.6L19 12z" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void removeScreenshot(index)}
+                        disabled={pending || upload.uploading}
+                        aria-label={`Remove screenshot ${index + 1}`}
+                        title="Remove screenshot"
+                        className="flex h-7 w-7 items-center justify-center rounded-full text-ink-soft disabled:opacity-30"
+                      >
+                        <svg aria-hidden viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
+                          <path d="M7 6 5.6 7.4 10.2 12l-4.6 4.6L7 18l5-5 5 5 1.4-1.4L13.8 12l4.6-4.6L17 6l-5 5z" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveScreenshot(index, 1)}
+                        disabled={index === selectedUploads.length - 1 || pending || upload.uploading}
+                        aria-label={`Move screenshot ${index + 1} later`}
+                        title="Move later"
+                        className="flex h-7 w-7 items-center justify-center rounded-full text-ink-soft disabled:opacity-30"
+                      >
+                        <svg aria-hidden viewBox="0 0 24 24" className="h-4 w-4 rotate-180" fill="currentColor">
+                          <path d="m12 5-7 7 1.4 1.4 4.6-4.6V20h2V8.8l4.6 4.6L19 12z" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            <label
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line-strong text-ink-faint ${
+                upload.uploading || pending || selectedUploads.length >= MAX_CHAT_SCREENSHOTS
+                  ? 'cursor-not-allowed opacity-40'
+                  : 'cursor-pointer'
+              }`}
+              htmlFor="chat-screenshots"
+              title="Add screenshots"
+            >
+              <svg aria-hidden viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+                <path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z" />
+              </svg>
+            </label>
             <input
-              id="chat-client-name"
-              name="client_name"
-              type="text"
-              required
-              className="input mt-1"
-              placeholder="Client name"
+              id="chat-screenshots"
+              ref={fileRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              multiple
+              disabled={upload.uploading || pending || selectedUploads.length >= MAX_CHAT_SCREENSHOTS}
+              onChange={(event) => {
+                const files = Array.from(event.currentTarget.files ?? []);
+                event.currentTarget.value = '';
+                void handleFiles(files);
+              }}
+              className="sr-only"
             />
-          </label>
-        )}
+            <p className="min-w-0 flex-1 truncate text-[13px] text-ink-faint" role="status">
+              {upload.uploading
+                ? `Uploading ${upload.uploadingCount} screenshot${upload.uploadingCount === 1 ? '' : 's'}...`
+                : selectedUploads.length > 0
+                  ? `${selectedUploads.length} selected. Choose their conversation order.`
+                  : 'Add screenshots of the conversation'}
+            </p>
+            <button
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand text-white disabled:opacity-40"
+              type="submit"
+              disabled={pending || upload.uploading || selectedUploads.length === 0}
+              title="Send"
+              aria-label="Read screenshots and write a reply"
+            >
+              <svg aria-hidden viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+                <path d="M12 4l6 6h-4v10h-4V10H8z" />
+              </svg>
+            </button>
+          </div>
 
-        <div className="flex items-center gap-2">
-          <label
-            className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full border border-line-strong text-ink-faint"
-            htmlFor="chat-screenshot"
-            title="Attach a screenshot"
-          >
-            <svg aria-hidden viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
-              <path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z" />
-            </svg>
-          </label>
           <input
-            id="chat-screenshot"
-            ref={fileRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif"
-            onChange={(event) => handleFiles(event.target.files)}
-            className="sr-only"
+            type="hidden"
+            name="screenshots"
+            value={JSON.stringify(selectedUploads.map(({ path, name }) => ({ path, name })))}
           />
-          <p className="min-w-0 flex-1 truncate text-[13px] text-ink-faint">
-            {upload.uploading
-              ? 'Uploading...'
-              : upload.path
-                ? upload.name
-                : 'Attach a screenshot of the conversation'}
-          </p>
-          <button
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand text-white disabled:opacity-40"
-            type="submit"
-            disabled={pending || upload.uploading || !(upload.path || state.path)}
-            title="Send"
-          >
-            <svg aria-hidden viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
-              <path d="M12 4l6 6h-4v10h-4V10H8z" />
-            </svg>
-          </button>
-        </div>
-
-        <input type="hidden" name="storage_path" value={upload.path ?? state.path ?? ''} />
-        <input type="hidden" name="original_name" value={upload.name ?? 'screenshot'} />
-      </form>
+        </form>
+      )}
     </div>
   );
 }

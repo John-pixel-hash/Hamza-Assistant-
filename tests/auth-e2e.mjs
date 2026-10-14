@@ -344,6 +344,20 @@ async function main() {
     check(`owner reaches ${path}`, res.status === 200, `status ${res.status}`);
   }
 
+  const chatCapturePage = await fetch(`${APP}/chat`, { headers: cookieHeader, redirect: 'manual' });
+  const chatCaptureHtml = await chatCapturePage.text();
+  const screenshotInput = chatCaptureHtml.match(/<input\b[^>]*id="chat-screenshots"[^>]*>/)?.[0] ?? '';
+  check(
+    'Chat accepts a batch of PNG, JPEG, and WebP screenshots',
+    chatCapturePage.status === 200 && /\bmultiple(?:=""|\s|>)/i.test(screenshotInput) && /image\/webp/i.test(screenshotInput),
+    'the picker needs multi-select and supported image types',
+  );
+  check(
+    'Chat explains the ten-image cap and lets the user reorder screenshots',
+    /up to 10 screenshots/i.test(chatCaptureHtml) && /reorder or remove them before sending/i.test(chatCaptureHtml),
+    'the selection needs a visible limit and clear instructions for ordering and removal',
+  );
+
   // Phase 6: project intake. The form is the front door of delivery mode, so
   // it has to be reachable and honest about what happens on submit.
   const newProject = await fetch(`${APP}/projects/new`, { headers: cookieHeader, redirect: 'manual' });

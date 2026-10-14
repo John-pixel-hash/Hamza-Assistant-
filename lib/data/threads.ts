@@ -115,7 +115,10 @@ export type ThreadDetail = {
   attachments: AttachmentRow[];
 };
 
-export async function getThread(id: string): Promise<ThreadDetail | null> {
+export async function getThread(
+  id: string,
+  options: { withAttachments?: boolean } = {},
+): Promise<ThreadDetail | null> {
   if (!SUPABASE_CONFIGURED) return null;
   if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
 
@@ -147,7 +150,7 @@ export async function getThread(id: string): Promise<ThreadDetail | null> {
   const messageIds = (messages ?? []).map((m) => m.id as string);
 
   let attachments: AttachmentRow[] = [];
-  if (messageIds.length > 0) {
+  if (options.withAttachments !== false && messageIds.length > 0) {
     const { data: rows } = await supabase
       .from('attachments')
       .select('id, message_id, storage_path, original_name, kind, size_bytes, extracted_text')
@@ -158,7 +161,7 @@ export async function getThread(id: string): Promise<ThreadDetail | null> {
 
     // Files are private. Each one needs a short lived signed link.
     if (attachments.length > 0) {
-      const paths = attachments.map((a) => a.storage_path);
+      const paths = [...new Set(attachments.map((a) => a.storage_path))];
       const { data: signed } = await supabase.storage
         .from('attachments')
         .createSignedUrls(paths, 60 * 60);

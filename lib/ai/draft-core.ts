@@ -36,6 +36,10 @@ export type DraftRequest = {
   instruction?: string | null;
   /** Start on the fast model: used by flows inside the serverless time box. */
   fast?: boolean;
+  /** Optional shorter end-to-end provider budget for a combined server action. */
+  budgetMs?: number;
+  /** Optional per-call timeout, capped by the shared hard limit. */
+  attemptTimeoutMs?: number;
   channel?: string;
   /** Operating knowledge matched to this request, loaded by the caller. */
   knowledge?: string;
