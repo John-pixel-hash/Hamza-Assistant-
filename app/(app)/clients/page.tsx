@@ -92,7 +92,13 @@ export default async function ClientsPage({
                   {client.last_message && (
                     <p className="mt-3 line-clamp-2 text-[13px] text-ink-soft">
                       <span className="font-medium text-ink-faint">
-                        {client.last_message_role === 'client' ? 'They said: ' : 'You said: '}
+                        {client.last_message_role === 'client'
+                          ? 'They said: '
+                          : client.last_message_role === 'assistant'
+                            ? 'Assistant draft: '
+                            : client.last_message_role === 'note'
+                              ? 'Note: '
+                              : 'You said: '}
                       </span>
                       {preview(client.last_message, 140)}
                     </p>

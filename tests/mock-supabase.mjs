@@ -101,6 +101,15 @@ export const FIXTURE = {
       sent_at: '2026-10-02T10:00:00Z',
       created_at: '2026-10-02T10:00:00Z',
     },
+    {
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      thread_id: '22222222-2222-4222-8222-222222222222',
+      role: 'assistant',
+      content: 'I can meet you at 175 and start today.',
+      channel: 'fiverr',
+      sent_at: '2026-10-02T10:01:00Z',
+      created_at: '2026-10-02T10:01:00Z',
+    },
   ],
   projectId: '55555555-5555-4555-8555-555555555555',
   project: {

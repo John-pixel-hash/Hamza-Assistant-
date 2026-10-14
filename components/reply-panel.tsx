@@ -260,7 +260,7 @@ export function ReplyPanel({
             ? slowDraft
               ? 'Taking longer than usual. Nothing is saved until you choose.'
               : 'Reading the thread and writing your reply.'
-            : 'Usually takes 6 to 18 seconds. Nothing is sent automatically.'}
+            : 'Usually takes 6 to 18 seconds. Each draft is saved here; you choose whether to send it.'}
         </p>
       </form>
 
@@ -272,6 +272,15 @@ export function ReplyPanel({
 
       {draftState.draft && !drafting && (
         <div className="mt-4 border-t border-line pt-4">
+          {draftState.draftSaved ? (
+            <p className="mb-3 text-[13px] text-brand-ink" role="status">
+              Saved to the thread as an assistant draft. Nothing has been sent.
+            </p>
+          ) : (
+            <div className="alert alert-warn mb-3" role="alert">
+              {draftState.draftSaveError ?? 'The draft is ready, but it is not saved yet. Copy it before you leave.'}
+            </div>
+          )}
           {draftState.fixed && draftState.ok && (
             <p className="mb-2 text-[13px] text-ink-faint">
               I adjusted the first draft to meet the reply checks. Review this version before sending.

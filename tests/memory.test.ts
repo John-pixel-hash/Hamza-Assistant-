@@ -120,6 +120,19 @@ test('the summary prompt keeps old truth and carries the slice', () => {
   assert.match(prompt, /I am ready now/);
 });
 
+test('assistant drafts are never treated as client facts or relationship history', () => {
+  const messages = [
+    { role: 'client', content: 'I am in Pakistan and my budget is 7000 Rs' },
+    { role: 'assistant', content: 'I can offer the full build for 5000 Rs.' },
+  ];
+
+  const extraction = buildMemoryPrompt(messages);
+  const summary = buildSummaryPrompt(null, messages);
+  assert.match(extraction, /I am in Pakistan/);
+  assert.doesNotMatch(extraction, /I can offer the full build/);
+  assert.doesNotMatch(summary, /I can offer the full build/);
+});
+
 test('the prompt states the no-guessing rule and carries the slice', () => {
   const prompt = buildMemoryPrompt([
     { role: 'client', content: 'I am in Pakistan and my budget is 7000 Rs' },

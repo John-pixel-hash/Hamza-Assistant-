@@ -33,11 +33,19 @@ export const CONFIDENCE_VALUE: Record<FactConfidence, number> = {
   medium: 0.6,
 };
 
-export function buildMemoryPrompt(messages: { role: string; content: string }[]): string {
-  const slice = messages
-    .map((m) => `${m.role === 'me' ? 'HAMZA' : 'CLIENT'}: ${m.content}`)
+function memorySlice(messages: { role: string; content: string }[]): string {
+  return messages
+    .filter((message) => ['client', 'me', 'note'].includes(message.role))
+    .map((message) => {
+      const speaker = message.role === 'me' ? 'HAMZA' : message.role === 'note' ? 'PRIVATE NOTE' : 'CLIENT';
+      return `${speaker}: ${message.content}`;
+    })
     .join('\n')
     .slice(-6000);
+}
+
+export function buildMemoryPrompt(messages: { role: string; content: string }[]): string {
+  const slice = memorySlice(messages);
 
   return [
     'You are the memory of a one person business. Read this slice of a client',
@@ -109,10 +117,7 @@ export function buildSummaryPrompt(
   currentSummary: string | null,
   messages: { role: string; content: string }[],
 ): string {
-  const slice = messages
-    .map((m) => `${m.role === 'me' ? 'HAMZA' : 'CLIENT'}: ${m.content}`)
-    .join('\n')
-    .slice(-6000);
+  const slice = memorySlice(messages);
 
   return [
     'You keep the rolling summary of this business relationship. Read the',

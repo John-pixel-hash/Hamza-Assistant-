@@ -122,7 +122,9 @@ export default async function TodayPage() {
                     <p className="truncate font-medium">{client.name}</p>
                     <p className="truncate text-[13px] muted">
                       {client.company ?? 'No company'}
-                      {client.last_message ? ` · ${preview(client.last_message, 60)}` : ''}
+                      {client.last_message
+                        ? ` · ${client.last_message_role === 'assistant' ? 'Draft: ' : ''}${preview(client.last_message, 60)}`
+                        : ''}
                     </p>
                   </div>
                   <StageBadge

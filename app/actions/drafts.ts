@@ -10,11 +10,12 @@ import { getThread } from '@/lib/data/threads';
 import { draftReply } from '@/lib/ai/draft';
 import { draftFailureMessage } from '@/lib/ai/draft-errors';
 import { runMemoryPass } from '@/lib/ai/memory-live';
+import { saveAssistantDraft } from '@/lib/chat/assistant-draft';
 import type { Tone } from '@/lib/ai/voice';
 
 /**
- * The two things the reply panel does: produce a draft, and record what was
- * actually sent.
+ * The two things the reply panel does: save an unsent assistant draft, and
+ * separately record what was actually sent.
  *
  * Recording the sent version is the whole learning loop. The difference between
  * the draft and what he sends is the only honest signal about where the
@@ -33,6 +34,12 @@ function asTone(value: string): Tone {
 
 /** Everything the model is allowed to know about this conversation. */
 export async function loadConversation(threadId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
   const detail = await getThread(threadId);
   if (!detail) return null;
 
@@ -45,7 +52,7 @@ export async function loadConversation(threadId: string) {
 
   // The project query is filtered by client id in SQL, so another client's work
   // cannot reach the prompt.
-  return { detail, client: clientResult.client, facts, projects };
+  return { userId: user.id, detail, client: clientResult.client, facts, projects };
 }
 
 export async function draftReplyAction(
@@ -71,7 +78,7 @@ export async function draftReplyAction(
     const loaded = await loadConversation(threadId);
     if (!loaded) return { ...base, error: 'That thread could not be found.' };
 
-    const { detail, client, facts, projects } = loaded;
+    const { userId, detail, client, facts, projects } = loaded;
     stage = 'writing the draft';
     const outcome = await draftReply({
       channel,
@@ -114,6 +121,31 @@ export async function draftReplyAction(
       return { ...base, error: 'The model returned nothing. Try again.' };
     }
 
+    let draftSaved = false;
+    let draftSaveError: string | null = null;
+    try {
+      const saved = await saveAssistantDraft(await createClient(), {
+        userId,
+        threadId,
+        content: outcome.text,
+        channel,
+        source: 'thread_reply',
+        outcome,
+      });
+      if (saved.error) {
+        console.error('[drafts] assistant draft save failed', saved.error);
+        draftSaveError = 'The draft is ready, but I could not save it to the thread. Copy it before you leave.';
+      } else {
+        draftSaved = true;
+        revalidatePath(`/threads/${threadId}`);
+        revalidatePath('/');
+        if (client?.id) revalidatePath(`/clients/${client.id}`);
+      }
+    } catch (saveError) {
+      console.error('[drafts] assistant draft save failed', saveError instanceof Error ? saveError.message : saveError);
+      draftSaveError = 'The draft is ready, but I could not save it to the thread. Copy it before you leave.';
+    }
+
     return {
       error: null,
       draft: outcome.text.trim(),
@@ -123,6 +155,8 @@ export async function draftReplyAction(
       attempts: outcome.attempts,
       latencyMs: outcome.latencyMs,
       modelId: outcome.modelId,
+      draftSaved,
+      draftSaveError,
       incoming,
       channel,
     };

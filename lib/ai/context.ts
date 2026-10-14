@@ -111,12 +111,16 @@ export function assembleContext(input: ContextInput): AssembledContext {
   const { client, thread, messages, facts = [], projects = [] } = input;
   const limit = input.historyLimit ?? DEFAULT_HISTORY;
 
-  const ordered = [...messages].sort((a, b) => {
-    const at = a.sent_at ?? '';
-    const bt = b.sent_at ?? '';
-    if (at === bt) return 0;
-    return at < bt ? -1 : 1;
-  });
+  // Saved assistant drafts are useful in the timeline, but were never sent to
+  // the client. Keep them out of the conversation and its reply-state logic.
+  const ordered = messages
+    .filter((message) => !['assistant', 'system', 'tool'].includes(message.role))
+    .sort((a, b) => {
+      const at = a.sent_at ?? '';
+      const bt = b.sent_at ?? '';
+      if (at === bt) return 0;
+      return at < bt ? -1 : 1;
+    });
 
   const kept = ordered.slice(-limit);
   const dropped = ordered.length - kept.length;

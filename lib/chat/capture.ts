@@ -14,6 +14,7 @@ import {
   type ChatScreenshotUpload,
 } from '@/lib/chat/capture-core';
 import { dedupeKey, pickThread } from '@/lib/chat/threads';
+import { saveAssistantDraft } from '@/lib/chat/assistant-draft';
 import { CHANNEL_LABELS, type Channel } from '@/lib/domain';
 import { createClient } from '@/lib/supabase/server';
 
@@ -32,6 +33,9 @@ export type ChatCaptureResult = {
   threadTitle?: string;
   /** True once the screenshots are linked to saved thread messages. */
   conversationSaved?: boolean;
+  /** The generated reply is stored separately as an unsent assistant draft. */
+  draftSaved?: boolean;
+  draftSaveError?: string;
   uploads?: ChatScreenshotUpload[];
   extracted?: { role: string; text: string }[];
 };
@@ -64,8 +68,8 @@ type LoadedScreenshot = {
  * The whole chain: download the private uploads, read them as one conversation,
  * match or create the client, keep one thread per platform, save messages and
  * link each image to the messages it shows, then draft once from the combined
- * history. The capture action keeps to a short model budget inside Vercel's
- * 60-second Hobby serverless limit.
+ * history and save the result as an unsent assistant message. The capture action
+ * keeps to a short model budget inside Vercel's 60-second Hobby serverless limit.
  */
 type CaptureProgress = {
   conversationSaved: boolean;
@@ -489,7 +493,33 @@ async function captureChatScreenshotsInner(
     };
   }
 
-  return { ok: true, reply, ...savedResult };
+  let draftSaved = false;
+  let draftSaveError: string | undefined;
+  try {
+    const savedDraft = await saveAssistantDraft(supabase, {
+      userId: user.id,
+      threadId,
+      content: reply,
+      channel: platform,
+      source: 'screenshot_capture',
+      outcome: draft,
+    });
+    if (savedDraft.error) {
+      console.error('[chat] assistant draft save failed', savedDraft.error);
+      draftSaveError = 'The reply is ready, but I could not save it to the thread. Copy it before you leave.';
+    } else {
+      draftSaved = true;
+      revalidatePath(`/threads/${threadId}`);
+      revalidatePath(`/clients/${clientId}`);
+      revalidatePath('/clients');
+      revalidatePath('/');
+    }
+  } catch (saveError) {
+    console.error('[chat] assistant draft save failed', saveError instanceof Error ? saveError.message : saveError);
+    draftSaveError = 'The reply is ready, but I could not save it to the thread. Copy it before you leave.';
+  }
+
+  return { ok: true, reply, draftSaved, draftSaveError, ...savedResult };
 }
 
 /** Convert unexpected network or provider failures into a recoverable form state. */

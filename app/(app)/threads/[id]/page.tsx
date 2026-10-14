@@ -86,12 +86,15 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
           messages.map((message) => {
             const files = attachmentsByMessage.get(message.id) ?? [];
             const isNote = message.role === 'note';
+            const isAssistantDraft = message.role === 'assistant';
             const onLeft = message.role === 'client' || isNote;
             const bubble = isNote
               ? 'rounded-2xl rounded-bl-md border border-dashed border-gold-line bg-gold-soft text-ink'
-              : onLeft
-                ? 'rounded-2xl rounded-bl-md bg-line text-ink'
-                : 'rounded-2xl rounded-br-md bg-brand text-white';
+              : isAssistantDraft
+                ? 'rounded-2xl rounded-br-md border border-brand/20 bg-brand-soft text-brand-ink'
+                : onLeft
+                  ? 'rounded-2xl rounded-bl-md bg-line text-ink'
+                  : 'rounded-2xl rounded-br-md bg-brand text-white';
             const channelLabel = message.channel
               ? (CHANNEL_LABELS[message.channel as keyof typeof CHANNEL_LABELS] ?? message.channel)
               : null;
@@ -104,6 +107,11 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
                 {isNote && (
                   <span className="mb-0.5 px-1 text-[11px] font-semibold uppercase tracking-wide text-gold">
                     Note
+                  </span>
+                )}
+                {isAssistantDraft && (
+                  <span className="mb-0.5 px-1 text-[11px] font-semibold uppercase tracking-wide text-brand-ink">
+                    Assistant draft · not sent
                   </span>
                 )}
 

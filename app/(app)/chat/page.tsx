@@ -12,7 +12,7 @@ export default function ChatPage() {
       <PageHeading
         eyebrow="Chat capture"
         title="Reply from screenshots"
-        description="Upload up to 10 screenshots. I will combine the conversation, save it to the right client, and draft one reply."
+        description="Upload up to 10 screenshots. I will save new messages and the reply draft to the thread. Nothing is sent."
       />
       <ChatCapture />
     </>

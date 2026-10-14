@@ -9,6 +9,7 @@ export type ClientRow = {
   last_contact_at: string | null;
   open_projects: number;
   last_message?: string | null;
+  last_message_role?: string | null;
 };
 
 export type FollowUpRow = {
@@ -89,7 +90,7 @@ export async function getOverview(): Promise<Overview> {
       supabase.from('playbooks').select('slug, content').eq('active', true),
       supabase
         .from('client_overview')
-        .select('id, name, company, stage, last_contact_at, open_projects, last_message')
+        .select('id, name, company, stage, last_contact_at, open_projects, last_message, last_message_role')
         .order('last_contact_at', { ascending: false, nullsFirst: false })
         .limit(5),
       supabase

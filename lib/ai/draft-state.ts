@@ -12,6 +12,9 @@ export type DraftState = {
   latencyMs: number;
   /** Which model actually wrote the draft, after any quota fallback. */
   modelId: string | null;
+  /** Drafts are saved as assistant messages, never as messages already sent. */
+  draftSaved: boolean;
+  draftSaveError: string | null;
   /** Echoed back so the panel can show what was being replied to. */
   incoming: string;
   channel: string;
@@ -26,6 +29,8 @@ export const EMPTY_DRAFT_STATE: DraftState = {
   attempts: 0,
   latencyMs: 0,
   modelId: null,
+  draftSaved: false,
+  draftSaveError: null,
   incoming: '',
   channel: 'instagram',
 };

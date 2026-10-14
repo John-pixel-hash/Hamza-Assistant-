@@ -21,9 +21,9 @@ import type { ExistingFact } from './memory';
  * One memory pass over a thread: read the last slice of the conversation,
  * extract stated facts with the lite model, and merge them into client_facts.
  *
- * It is called from the two save paths, right after a message lands, so the
- * next draft already knows what this one taught the system. It never throws:
- * a failed memory pass must not fail a save.
+ * It runs after conversational messages are saved, so the next draft knows
+ * what the client or owner actually said. Saved assistant drafts are excluded.
+ * It never throws: a failed memory pass must not fail a save.
  *
  * The client and generator are injectable so the verification script runs this
  * exact code with an admin client, rather than a re-implementation of it.
@@ -70,6 +70,7 @@ export async function runMemoryPass(
       .from('messages')
       .select('id, role, content')
       .eq('thread_id', threadId)
+      .in('role', ['client', 'me', 'note'])
       .order('sent_at', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(12);

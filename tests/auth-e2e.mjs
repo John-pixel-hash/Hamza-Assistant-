@@ -358,6 +358,11 @@ async function main() {
     /up to 10 screenshots/i.test(chatCaptureHtml) && /reorder or remove them before sending/i.test(chatCaptureHtml),
     'the selection needs a visible limit and clear instructions for ordering and removal',
   );
+  check(
+    'Chat tells the owner that the generated draft is saved to the thread',
+    /reply draft to the thread/i.test(chatCaptureHtml),
+    'the response should be saved as an unsent assistant draft',
+  );
 
   // Phase 6: project intake. The form is the front door of delivery mode, so
   // it has to be reachable and honest about what happens on submit.
@@ -533,6 +538,16 @@ async function main() {
     'the panel warns how long a draft takes, rather than looking frozen',
     /6 to 18 seconds/i.test(threadHtml),
     'a real draft takes 6 to 18 seconds, so the panel has to say so',
+  );
+  check(
+    'each reply draft is saved automatically without being marked as sent',
+    /each draft is saved here/i.test(threadHtml) && /you choose whether to send it/i.test(threadHtml),
+    'saved assistant drafts must stay distinct from messages actually sent',
+  );
+  check(
+    'saved assistant drafts are visibly distinct in thread history',
+    /Assistant draft · not sent/.test(threadHtml) && /I can meet you at 175 and start today/.test(threadHtml),
+    'the timeline must not make an unsent suggestion look like a sent reply',
   );
   check(
     'the panel quotes the last client message, so context is visible without scrolling',

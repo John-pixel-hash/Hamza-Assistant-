@@ -148,6 +148,24 @@ test('the context is keyed on the thread, so two clients cannot mix', async () =
   assert.match(michael.text, /Do not chase/);
 });
 
+test('saved assistant drafts are excluded from conversation context and reply state', async () => {
+  const { assembleContext } = await import('../lib/ai/context.ts');
+
+  const context = assembleContext({
+    client: { id: 'c1', name: 'Simon', stage: 'negotiating' },
+    thread: { id: 't1' },
+    messages: [
+      { role: 'client', content: 'Can you do 150?', sent_at: '2026-10-02T10:00:00Z' },
+      { role: 'assistant', content: 'I can reduce the price to 170.', sent_at: '2026-10-02T10:01:00Z' },
+    ],
+  });
+
+  assert.match(context.text, /Can you do 150/);
+  assert.doesNotMatch(context.text, /I can reduce the price to 170/);
+  assert.equal(context.includedMessages, 1);
+  assert.equal(context.awaitingMyReply, true, 'an unsent draft does not count as a sent reply');
+});
+
 test('history is trimmed from the oldest end, and the recent flow is kept in order', async () => {
   const { assembleContext } = await import('../lib/ai/context.ts');
 

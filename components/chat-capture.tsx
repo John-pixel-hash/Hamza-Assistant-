@@ -285,7 +285,7 @@ export function ChatCapture() {
     <div className="chat-capture-workspace flex flex-col justify-end">
       {!hasConversation && (
         <p className="mb-4 text-center text-[13px] text-ink-faint">
-          Choose up to 10 screenshots in conversation order. Reorder or remove them before sending. I will combine the conversation, save new messages, and draft one reply.
+          Choose up to 10 screenshots in conversation order. Reorder or remove them before sending. I will save new messages and the reply draft to the thread.
         </p>
       )}
 
@@ -350,10 +350,24 @@ export function ChatCapture() {
             <p className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-brand px-4 py-2.5 text-[14px] text-white">
               {state.reply}
             </p>
+            {state.draftSaved ? (
+              <p className="mt-2 text-[12px] text-brand-ink" role="status">
+                Draft saved to the thread. Nothing has been sent.
+              </p>
+            ) : (
+              <div className="alert alert-warn mt-2 max-w-[85%]" role="alert">
+                {state.draftSaveError ?? 'The reply is ready, but it is not saved to the thread yet. Copy it before you leave.'}
+              </div>
+            )}
             <div className="mt-2 flex flex-wrap justify-end gap-2">
               <button className="btn btn-quiet btn-small" type="button" onClick={copyReply}>
                 {copied ? 'Copied' : 'Copy'}
               </button>
+              {state.threadId && (
+                <Link className="btn btn-quiet btn-small" href={`/threads/${state.threadId}`}>
+                  Open thread
+                </Link>
+              )}
               {state.clientId && (
                 <Link className="btn btn-quiet btn-small" href={`/clients/${state.clientId}`}>
                   Open client
