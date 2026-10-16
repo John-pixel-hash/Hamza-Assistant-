@@ -360,8 +360,10 @@ async function main() {
   );
   check(
     'Chat tells the owner that the generated draft is saved to the thread',
-    /reply draft to the thread/i.test(chatCaptureHtml),
-    'the response should be saved as an unsent assistant draft',
+    /unsent reply draft/i.test(chatCaptureHtml) &&
+      /continue the matching client thread/i.test(chatCaptureHtml) &&
+      /nothing is sent/i.test(chatCaptureHtml),
+    'the capture should reuse the saved thread and store an unsent assistant draft',
   );
 
   // Phase 6: project intake. The form is the front door of delivery mode, so
@@ -531,8 +533,10 @@ async function main() {
   // here is the entry point: the paste box and the button that starts a draft.
   check(
     'the panel takes a pasted client message and offers to draft from it',
-    /what the client sent/i.test(threadHtml) && /draft the reply/i.test(threadHtml),
-    'the paste box and the draft button are the way in',
+    /newest client message \(optional\)/i.test(threadHtml) &&
+      /saved to this thread before i draft/i.test(threadHtml) &&
+      /draft the reply/i.test(threadHtml),
+    'the latest client message is saved to the existing thread before drafting',
   );
   check(
     'the panel warns how long a draft takes, rather than looking frozen',
@@ -546,7 +550,7 @@ async function main() {
   );
   check(
     'saved assistant drafts are visibly distinct in thread history',
-    /Assistant draft · not sent/.test(threadHtml) && /I can meet you at 175 and start today/.test(threadHtml),
+    /Assistant draft · not sent/.test(threadHtml) && /I can meet you at 175 and start today\. Does that work for you\?/.test(threadHtml),
     'the timeline must not make an unsent suggestion look like a sent reply',
   );
   check(
@@ -614,6 +618,25 @@ async function main() {
     redirect: 'manual',
   });
   const clientPageHtml = await clientPageRes.text();
+  const existingThreadAt = clientPageHtml.indexOf('Most recent');
+  const newThreadDisclosureAt = clientPageHtml.indexOf('Start a separate conversation thread');
+  check(
+    'an existing conversation is the primary action, with new threads secondary',
+    existingThreadAt > -1 &&
+      newThreadDisclosureAt > existingThreadAt &&
+      clientPageHtml.includes('Continue'),
+    'the owner should open the saved conversation instead of being steered into creating another thread',
+  );
+  check(
+    'thread summary counts sent messages and saved drafts separately',
+    /2[\s\S]{0,80}messages/.test(clientPageHtml) && /1 saved draft/.test(clientPageHtml),
+    'an unsent assistant draft must not inflate the count of messages in the conversation',
+  );
+  check(
+    'client history labels assistant drafts in a plain dated list',
+    clientPageHtml.includes('Assistant draft') && !clientPageHtml.includes('rounded-br-md'),
+    'cross-thread history stays a plain list and never makes an unsent draft look sent',
+  );
   check(
     'the client page shows the fact sheet he can govern',
     clientPageRes.status === 200 &&

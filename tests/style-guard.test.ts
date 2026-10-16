@@ -182,6 +182,41 @@ test('a clean message passes every new check', async () => {
   assert.equal(result.actions.overQuestioned, false);
 });
 
+test('reply shape requires one closing question and no more than three sentences', async () => {
+  const { countSentences, enforceStyle } = await import('../lib/ai/style-guard.ts');
+  assert.equal(countSentences('The price is $199.99. It covers the build. Want me to send the details?'), 3);
+
+  const valid = enforceStyle(
+    'That month one result sounds promising. The cards are already bringing people in. Are referrals growing too?',
+    { channel: 'instagram', requireReplyShape: true },
+  );
+  assert.equal(valid.actions.missingClosingQuestion, false);
+  assert.equal(valid.actions.tooManySentences, false);
+
+  const noQuestion = enforceStyle('The cards are bringing in clients.', {
+    channel: 'instagram',
+    requireReplyShape: true,
+  });
+  assert.equal(noQuestion.actions.missingClosingQuestion, true);
+
+  const long = enforceStyle('That is useful. The cards work. Word of mouth helps. Local ads could help too. Are they?', {
+    channel: 'instagram',
+    requireReplyShape: true,
+  });
+  assert.equal(long.actions.tooManySentences, true);
+});
+
+test('corporate filler and awkward state-verb progressives are caught', async () => {
+  const { findStiffPhrases, enforceStyle } = await import('../lib/ai/style-guard.ts');
+  const phrases = findStiffPhrases('Are you currently wanting help? Furthermore, feel free to reach out.');
+  assert.ok(phrases.includes('are you currently wanting'));
+  assert.ok(phrases.includes('furthermore'));
+  assert.ok(phrases.includes('feel free to'));
+
+  const result = enforceStyle('Are you needing help? Furthermore, I can assist.', { channel: 'instagram' });
+  assert.ok(result.actions.stiffPhrases.length > 0);
+});
+
 test('the guard catches the chase he actually sent, typos included', async () => {
   const { findChasePhrases } = await import('../lib/ai/style-guard.ts');
 

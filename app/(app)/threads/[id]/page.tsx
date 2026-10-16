@@ -66,7 +66,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
           client's last message is quoted inside the panel, so the context is
           visible without scrolling at all. */}
       <ReplyPanel
-        defaultChannel={client?.channel ?? 'instagram'}
+        defaultChannel={client?.channel ?? 'other'}
         lastClientMessage={lastFromClient}
         threadId={thread.id}
       />

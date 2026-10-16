@@ -11,6 +11,8 @@ import { draftReply } from '@/lib/ai/draft';
 import { draftFailureMessage } from '@/lib/ai/draft-errors';
 import { runMemoryPass } from '@/lib/ai/memory-live';
 import { saveAssistantDraft } from '@/lib/chat/assistant-draft';
+import { isLatestClientMessage } from '@/lib/chat/threads';
+import { isChannel } from '@/lib/domain';
 import type { Tone } from '@/lib/ai/voice';
 
 /**
@@ -61,7 +63,7 @@ export async function draftReplyAction(
 ): Promise<DraftState> {
   const threadId = String(formData.get('thread_id') ?? '');
   const incoming = String(formData.get('incoming') ?? '').trim();
-  const channel = String(formData.get('channel') ?? 'instagram');
+  const channel = String(formData.get('channel') ?? 'other');
   const tone = asTone(String(formData.get('tone') ?? 'unknown'));
   const instruction = String(formData.get('instruction') ?? '').trim();
   const base = { ...EMPTY_DRAFT_STATE, incoming, channel };
@@ -79,6 +81,54 @@ export async function draftReplyAction(
     if (!loaded) return { ...base, error: 'That thread could not be found.' };
 
     const { userId, detail, client, facts, projects } = loaded;
+    let conversationMessages = detail.messages.map((message) => ({
+      role: message.role,
+      content: message.content,
+      sent_at: message.sent_at ?? message.created_at,
+      channel: message.channel,
+    }));
+
+    if (incoming) {
+      if (incoming.length > 6000) {
+        return { ...base, error: 'That client message is too long to save. Shorten it and try again.' };
+      }
+      if (!isLatestClientMessage(detail.messages, incoming)) {
+        const sentAt = new Date().toISOString();
+        try {
+          const supabase = await createClient();
+          const { error } = await supabase.from('messages').insert({
+            user_id: userId,
+            thread_id: threadId,
+            role: 'client',
+            content: incoming,
+            channel: isChannel(channel) ? channel : null,
+            sent_at: sentAt,
+          });
+          if (error) {
+            console.error('[drafts] latest client message save failed', error.message);
+            return {
+              ...base,
+              error: 'I could not save the new client message, so I did not draft from an unsaved conversation. Try again.',
+            };
+          }
+        } catch (saveError) {
+          console.error('[drafts] latest client message save failed', saveError instanceof Error ? saveError.message : saveError);
+          return {
+            ...base,
+            error: 'I could not save the new client message, so I did not draft from an unsaved conversation. Try again.',
+          };
+        }
+        conversationMessages = [
+          ...conversationMessages,
+          { role: 'client', content: incoming, sent_at: sentAt, channel: isChannel(channel) ? channel : null },
+        ];
+        revalidatePath(`/threads/${threadId}`);
+        const clientId = client?.id ?? detail.thread.client_id;
+        if (clientId) revalidatePath(`/clients/${clientId}`);
+        revalidatePath('/clients');
+      }
+    }
+
     stage = 'writing the draft';
     const outcome = await draftReply({
       channel,
@@ -100,19 +150,14 @@ export async function draftReplyAction(
           notes: client?.notes ?? null,
         },
         thread: { id: detail.thread.id, title: detail.thread.title, mode: detail.thread.mode },
-        messages: detail.messages.map((message) => ({
-          role: message.role,
-          content: message.content,
-          sent_at: message.sent_at ?? message.created_at,
-          channel: message.channel,
-        })),
+        messages: conversationMessages,
         facts: facts.map((fact) => ({
           key: fact.key,
           value: fact.value,
           confidence: fact.confidence,
         })),
         projects,
-        incoming: incoming || null,
+        incoming: null,
         channel,
       },
     });
@@ -157,7 +202,7 @@ export async function draftReplyAction(
       modelId: outcome.modelId,
       draftSaved,
       draftSaveError,
-      incoming,
+      incoming: '',
       channel,
     };
   } catch (error) {
@@ -190,7 +235,7 @@ export async function saveSentAction(
   const threadId = String(formData.get('thread_id') ?? '');
   const sent = String(formData.get('sent') ?? '').trim();
   const incoming = String(formData.get('incoming') ?? '').trim();
-  const channel = String(formData.get('channel') ?? 'instagram');
+  const channel = String(formData.get('channel') ?? 'other');
 
   if (!/^[0-9a-f-]{36}$/i.test(threadId)) {
     return { error: 'That thread could not be found.', saved: false };
@@ -204,16 +249,34 @@ export async function saveSentAction(
   } = await supabase.auth.getUser();
   if (!user) return { error: 'Your session expired. Sign in again.', saved: false };
 
-  const now = new Date().toISOString();
-  const rows = [];
+  let incomingIsAlreadyLatest = false;
   if (incoming) {
+    const { data: latestMessages, error: latestError } = await supabase
+      .from('messages')
+      .select('role, content')
+      .eq('thread_id', threadId)
+      .in('role', ['client', 'me'])
+      .order('sent_at', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (latestError) {
+      console.error('[drafts] incoming message dedupe failed', latestError.message);
+      return { error: 'I could not check whether that client message is already saved. Nothing was added. Try again.', saved: false };
+    }
+    incomingIsAlreadyLatest = isLatestClientMessage(latestMessages ?? [], incoming);
+  }
+
+  const baseTime = Date.now();
+  const storedChannel = isChannel(channel) ? channel : null;
+  const rows = [];
+  if (incoming && !incomingIsAlreadyLatest) {
     rows.push({
       user_id: user.id,
       thread_id: threadId,
       role: 'client',
       content: incoming.slice(0, 6000),
-      channel,
-      sent_at: now,
+      channel: storedChannel,
+      sent_at: new Date(baseTime).toISOString(),
     });
   }
   rows.push({
@@ -221,8 +284,8 @@ export async function saveSentAction(
     thread_id: threadId,
     role: 'me',
     content: sent.slice(0, 6000),
-    channel,
-    sent_at: now,
+    channel: storedChannel,
+    sent_at: new Date(baseTime + (incoming && !incomingIsAlreadyLatest ? 1 : 0)).toISOString(),
   });
 
   const { error } = await supabase.from('messages').insert(rows);

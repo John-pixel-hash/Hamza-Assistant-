@@ -8,25 +8,29 @@ function input(overrides: Partial<AssistantDraftInput> = {}): AssistantDraftInpu
   return {
     userId: 'user-1',
     threadId: 'thread-1',
-    content: '  I can confirm the revised price today.  ',
+    content: '  I can confirm the revised price today. Does that work for you?  ',
     channel: 'fiverr',
     source: 'thread_reply',
     createdAt: '2026-10-14T10:00:00.000Z',
     outcome: {
       ok: true,
-      text: 'I can confirm the revised price today.',
+      text: 'I can confirm the revised price today. Does that work for you?',
       fixed: false,
       attempts: 1,
       actions: {
         dashesReplaced: 0,
         fillerRemoved: 0,
-        words: 7,
+        words: 12,
         lengthOk: true,
         overBudgetBy: 0,
         chasePhrases: [],
         bannedOpeners: [],
-        questions: 0,
+        questions: 1,
         overQuestioned: false,
+        missingClosingQuestion: false,
+        sentenceCount: 2,
+        tooManySentences: false,
+        stiffPhrases: [],
         hasListMarkers: false,
       },
       problems: [],
@@ -43,8 +47,8 @@ test('generated replies are stored as unsent assistant drafts with provenance', 
   const meta = row.meta as { kind: string; source: string; sent: boolean };
 
   assert.equal(row.role, 'assistant');
-  assert.equal(row.content, 'I can confirm the revised price today.');
-  assert.equal(row.channel, null, 'channels outside the messages schema are not written');
+  assert.equal(row.content, 'I can confirm the revised price today. Does that work for you?');
+  assert.equal(row.channel, 'tiktok', 'the TikTok channel is recorded for future context');
   assert.equal(row.sent_at, '2026-10-14T10:00:00.000Z');
   assert.equal(row.model_id, 'gemini-3.5-flash');
   assert.equal(row.latency_ms, 1200);

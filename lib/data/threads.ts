@@ -8,6 +8,7 @@ export type ThreadSummary = {
   status: string;
   updated_at: string;
   message_count: number;
+  draft_count: number;
   last_message_at: string | null;
 };
 
@@ -39,7 +40,7 @@ export async function getClientThreads(clientId: string): Promise<ThreadSummary[
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('threads')
-    .select('id, title, mode, status, updated_at, messages(id, sent_at, created_at)')
+    .select('id, title, mode, status, updated_at, messages(id, role, sent_at, created_at)')
     .eq('client_id', clientId)
     .order('updated_at', { ascending: false });
 
@@ -49,15 +50,17 @@ export async function getClientThreads(clientId: string): Promise<ThreadSummary[
   }
 
   return (data ?? []).map((row) => {
-    const messages = (row.messages ?? []) as { sent_at: string | null; created_at: string }[];
-    const times = messages.map((m) => m.sent_at ?? m.created_at).sort();
+    const messages = (row.messages ?? []) as { role: string; sent_at: string | null; created_at: string }[];
+    const conversationMessages = messages.filter((message) => !['assistant', 'system', 'tool'].includes(message.role));
+    const times = conversationMessages.map((message) => message.sent_at ?? message.created_at).sort();
     return {
       id: row.id as string,
       title: row.title as string,
       mode: row.mode as string,
       status: row.status as string,
       updated_at: row.updated_at as string,
-      message_count: messages.length,
+      message_count: conversationMessages.length,
+      draft_count: messages.filter((message) => message.role === 'assistant').length,
       last_message_at: times.length > 0 ? (times[times.length - 1] as string) : null,
     };
   });

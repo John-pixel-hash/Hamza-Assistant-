@@ -26,6 +26,14 @@ test('parseVisionJson maps a clean single-image payload', () => {
   assert.equal(extraction.tone, 'casual');
 });
 
+test('the screenshot reader recognises TikTok as a supported platform', () => {
+  assert.match(buildVisionPrompt(1), /instagram\|tiktok\|call/);
+  const extraction = parseVisionJson(
+    JSON.stringify({ platform: 'tiktok', client_name: 'A client', messages: [{ role: 'client', text: 'Hi' }] }),
+  );
+  assert.equal(extraction?.platform, 'tiktok');
+});
+
 test('parseVisionJson tolerates fences and prose around the JSON', () => {
   const extraction = parseVisionJson(
     'Here you go: ```json {"platform":"whatsapp","client_name":null,"messages":[{"role":"client","text":"salam"}],"tone":null} ```',

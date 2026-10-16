@@ -71,19 +71,16 @@ Private matters. This is your client data and your business.
 
 Full click by click instructions are in `docs/04-SETUP.md`, Step 1. The short
 version: create the project, choose the region closest to Lagos, then run the
-four migration files in the SQL editor in order.
+eight migration files in the SQL editor in order.
 
 Come back here once **Table Editor** shows `clients`, `messages`, `projects` and
 `playbooks`.
 
-This has already been checked against your project. All four migrations are
-applied and verified: `clients`, `messages`, `threads`, `projects`, `playbooks`,
-`client_facts`, `research_notes`, `ai_runs` and `attachments` all respond, the
-Phase 2 columns (`messages.channel`, `messages.sent_at`) are present, the Phase
-2.1 objects (`client_overview.stage_rank`, `client_overview.last_message_at`,
-`pending_followups`) are present, and the search function `search_messages`
-returns without error. Nothing else needs running in the SQL editor except the
-conversation import in Step 6.
+The baseline schema was previously checked against your project. This release adds
+`supabase/migrations/0008_tiktok_channel.sql`. Run that file in the SQL editor
+before saving TikTok messages. It only expands the allowed message-channel
+values. Do not replay earlier migrations on an existing project. The conversation
+import in Step 6 is separate.
 
 ## Step 3: Create your account BEFORE switching the lock on
 

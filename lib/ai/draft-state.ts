@@ -32,7 +32,7 @@ export const EMPTY_DRAFT_STATE: DraftState = {
   draftSaved: false,
   draftSaveError: null,
   incoming: '',
-  channel: 'instagram',
+  channel: 'other',
 };
 
 export type SaveSentState = { error: string | null; saved: boolean };

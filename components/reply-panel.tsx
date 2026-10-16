@@ -13,6 +13,8 @@ const CHANNELS = [
   { value: 'tiktok', label: 'TikTok' },
   { value: 'upwork', label: 'Upwork' },
   { value: 'linkedin', label: 'LinkedIn' },
+  { value: 'call', label: 'Call' },
+  { value: 'other', label: 'Other / not sure' },
 ];
 
 const TONES = [
@@ -61,7 +63,6 @@ export function ReplyPanel({
   const [draftState, draftAction, drafting] = useActionState(draftReplyAction, EMPTY_DRAFT_STATE);
   const [saveState, saveAction, saving] = useActionState(saveSentAction, SAVE_SENT_INITIAL);
   const [slowDraft, setSlowDraft] = useState(false);
-  const [showIncoming, setShowIncoming] = useState(!lastClientMessage);
   const retrying = drafting && Boolean(draftState.error);
 
   useEffect(() => {
@@ -76,12 +77,19 @@ export function ReplyPanel({
 
   const [incoming, setIncoming] = useState('');
   const [channel, setChannel] = useState(
-    CHANNELS.some((item) => item.value === defaultChannel) ? defaultChannel : 'instagram',
+    CHANNELS.some((item) => item.value === defaultChannel) ? defaultChannel : 'other',
   );
   const [tone, setTone] = useState('unknown');
   const [text, setText] = useState('');
   const [detectedTone, setDetectedTone] = useState<string | null>(null);
   const toneTouched = useRef(false);
+
+  useEffect(() => {
+    if (!draftState.draftSaved || !draftState.draft) return;
+    setIncoming('');
+    setDetectedTone(null);
+    if (!toneTouched.current) setTone('unknown');
+  }, [draftState.draftSaved, draftState.draft]);
 
   useEffect(() => {
     if (incoming.trim().length < 12) {
@@ -146,43 +154,23 @@ export function ReplyPanel({
       <form action={draftAction} className="mt-3">
         <input name="thread_id" type="hidden" value={threadId} />
 
-        {(showIncoming || !lastClientMessage) ? (
-          <div>
-            <label className="label" htmlFor="incoming">
-              {lastClientMessage ? 'Use a different message' : 'What the client sent'}
-            </label>
-            <textarea
-              className="field"
-              id="incoming"
-              name="incoming"
-              onChange={(event) => setIncoming(event.target.value)}
-              placeholder="Paste a message here. Leave it blank to use the thread history."
-              rows={2}
-              value={incoming}
-            />
-          </div>
-        ) : (
-          <input name="incoming" type="hidden" value="" />
-        )}
-
-        {lastClientMessage && (
-          <button
-            type="button"
-            className="mt-2 min-h-10 text-[13px] font-semibold text-brand-ink underline decoration-brand/40 underline-offset-4"
-            onClick={() => {
-              const next = !showIncoming;
-              if (!next) {
-                setIncoming('');
-                setDetectedTone(null);
-                if (!toneTouched.current) setTone('unknown');
-              }
-              setShowIncoming(next);
-            }}
-            aria-expanded={showIncoming}
-          >
-            {showIncoming ? 'Use the latest saved message' : 'Reply to a different message'}
-          </button>
-        )}
+        <div>
+          <label className="label" htmlFor="incoming">
+            Newest client message (optional)
+          </label>
+          <textarea
+            className="field"
+            id="incoming"
+            name="incoming"
+            onChange={(event) => setIncoming(event.target.value)}
+            placeholder="Paste a new client message. Leave blank to use the saved conversation."
+            rows={2}
+            value={incoming}
+          />
+          <p className="mt-1 text-[12px] text-ink-faint">
+            A new message is saved to this thread before I draft. Leave it blank to use the latest saved message.
+          </p>
+        </div>
 
         <details className="disclosure mt-3 rounded-xl border border-line">
           <summary>Adjust platform, tone, or instructions</summary>
@@ -258,7 +246,7 @@ export function ReplyPanel({
         <p id="draft-help" className="mt-2 text-[13px] text-ink-faint" role="status" aria-live="polite" aria-atomic="true">
           {drafting
             ? slowDraft
-              ? 'Taking longer than usual. Nothing is saved until you choose.'
+              ? 'Taking longer than usual. No reply is sent automatically.'
               : 'Reading the thread and writing your reply.'
             : 'Usually takes 6 to 18 seconds. Each draft is saved here; you choose whether to send it.'}
         </p>
@@ -314,21 +302,23 @@ export function ReplyPanel({
           <form action={saveAction} className="mt-3">
             <input name="thread_id" type="hidden" value={threadId} />
             <input name="channel" type="hidden" value={channel} />
-            <input name="incoming" type="hidden" value={incoming} />
             <input name="sent" type="hidden" value={text} />
             <button
               className="btn btn-primary w-full"
               disabled={saving || text.trim().length < 2}
               type="submit"
             >
-              {saving ? 'Saving...' : 'I sent it, save to thread'}
+              {saving ? 'Saving...' : 'I sent this, save it as sent'}
             </button>
+            <p className="mt-2 text-[12px] text-ink-faint">
+              After you send it on the selected platform, save the exact wording here. It will be marked as sent and used as context next time.
+            </p>
           </form>
 
           {saveState.error && <div className="alert alert-warn mt-2" role="alert">{saveState.error}</div>}
           {saveState.saved && (
             <p className="mt-2 text-[13px] text-brand-ink" role="status">
-              Saved to the thread. The next draft will use it as context.
+              Saved as your sent reply. The next draft will use it as context.
             </p>
           )}
         </div>

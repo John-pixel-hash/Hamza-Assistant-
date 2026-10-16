@@ -71,6 +71,15 @@ export function describeProblems(actions: GuardActions): string[] {
   if (actions.overQuestioned) {
     problems.push(`It asked ${actions.questions} questions. The limit is one.`);
   }
+  if (actions.missingClosingQuestion) {
+    problems.push('It must end with a short, direct question.');
+  }
+  if (actions.tooManySentences) {
+    problems.push(`It used ${actions.sentenceCount} sentences. Keep it to one to three.`);
+  }
+  if (actions.stiffPhrases.length > 0) {
+    problems.push(`It used stiff or corporate phrasing: ${actions.stiffPhrases.slice(0, 3).join(', ')}.`);
+  }
   if (actions.hasListMarkers) {
     problems.push('It was laid out as a list. A chat message is not a list.');
   }
@@ -90,6 +99,9 @@ function hasProblems(actions: GuardActions): boolean {
     actions.chasePhrases.length > 0 ||
     actions.bannedOpeners.length > 0 ||
     actions.overQuestioned ||
+    actions.missingClosingQuestion ||
+    actions.tooManySentences ||
+    actions.stiffPhrases.length > 0 ||
     actions.hasListMarkers ||
     actions.overBudgetBy > 0
   );
@@ -132,7 +144,7 @@ export async function draftReplyWith(
   request: DraftRequest,
 ): Promise<DraftOutcome> {
   const started = Date.now();
-  const channel = request.channel ?? request.context.channel ?? 'instagram';
+  const channel = request.channel ?? request.context.channel ?? 'other';
   const context = assembleContext({ ...request.context, channel });
 
   const system = buildVoicePrompt({
@@ -159,7 +171,8 @@ export async function draftReplyWith(
     maxOutputTokens: DRAFT_MAX_OUTPUT_TOKENS,
   });
 
-  const firstGuard = enforceStyleWithTelemetry(first.text, { channel });
+  const requireReplyShape = (request.purpose ?? 'reply') === 'reply';
+  const firstGuard = enforceStyleWithTelemetry(first.text, { channel, requireReplyShape });
   const firstProblems = describeProblems(firstGuard.actions);
 
   if (!hasProblems(firstGuard.actions)) {
@@ -181,7 +194,7 @@ export async function draftReplyWith(
     maxOutputTokens: DRAFT_MAX_OUTPUT_TOKENS,
   });
 
-  const secondGuard = enforceStyleWithTelemetry(second.text, { channel });
+  const secondGuard = enforceStyleWithTelemetry(second.text, { channel, requireReplyShape });
   const secondProblems = describeProblems(secondGuard.actions);
 
   return {

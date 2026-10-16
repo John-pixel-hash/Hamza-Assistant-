@@ -41,6 +41,40 @@ test('a clean draft is returned untouched with no second call', async () => {
   assert.deepEqual(outcome.problems, []);
 });
 
+test('a reply without one natural question at the end is repaired', async () => {
+  const { draftReplyWith } = await import('../lib/ai/draft-core.ts');
+  const seen: string[] = [];
+  const outcome = await draftReplyWith(
+    async ({ prompt }) => {
+      seen.push(prompt);
+      return seen.length === 1
+        ? { text: 'That is a promising start. The cards are bringing people in.', inputTokens: 10, outputTokens: 10 }
+        : { text: 'That is a promising start after one month. Are the cards bringing in more enquiries now?', inputTokens: 10, outputTokens: 10 };
+    },
+    baseRequest,
+  );
+
+  assert.equal(outcome.attempts, 2);
+  assert.equal(outcome.ok, true);
+  assert.equal(outcome.actions.missingClosingQuestion, false);
+  assert.match(seen[1] ?? '', /end with a short, direct question/i);
+});
+
+test('non-reply tasks are not forced into the closing-question shape', async () => {
+  const { draftReplyWith } = await import('../lib/ai/draft-core.ts');
+  let calls = 0;
+  const outcome = await draftReplyWith(
+    async () => {
+      calls += 1;
+      return { text: 'Confirm the product list before building the store.', inputTokens: 10, outputTokens: 10 };
+    },
+    { ...baseRequest, purpose: 'next_step' },
+  );
+  assert.equal(calls, 1);
+  assert.equal(outcome.ok, true);
+  assert.equal(outcome.actions.missingClosingQuestion, false);
+});
+
 test('a chase is caught and repaired, and the repair is a fresh call', async () => {
   const { draftReplyWith } = await import('../lib/ai/draft-core.ts');
 
@@ -98,7 +132,7 @@ test('a list is rejected in a chat message', async () => {
       seen.push(prompt);
       return seen.length === 1
         ? { text: 'What you get:\n- store build\n- product research\n- ads setup', inputTokens: 10, outputTokens: 10 }
-        : { text: 'The price covers the store build, the product research and the ads setup.', inputTokens: 10, outputTokens: 10 };
+        : { text: 'The price covers the store build, product research and ads setup. Would you like me to break down the scope?', inputTokens: 10, outputTokens: 10 };
     },
     baseRequest,
   );

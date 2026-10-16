@@ -8,6 +8,22 @@ export function normaliseContent(text: string): string {
   return text.toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
+/** Normalises names from OCR without losing accented characters. */
+export function normaliseClientName(name: string): string {
+  return name
+    .normalize('NFKD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
+/** True when the last saved client message is exactly the text being pasted. */
+export function isLatestClientMessage(messages: { role: string; content: string }[], incoming: string): boolean {
+  const latest = [...messages].reverse().find((message) => message.role === 'client' || message.role === 'me');
+  return Boolean(latest?.role === 'client' && dedupeKey('client', latest.content) === dedupeKey('client', incoming));
+}
+
 export function dedupeKey(role: string, content: string): string {
   return `${role}:${normaliseContent(content)}`;
 }

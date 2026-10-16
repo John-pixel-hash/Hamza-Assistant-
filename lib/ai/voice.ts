@@ -33,19 +33,21 @@ const TONE_RULES: Record<Tone, string> = {
 
 const CHANNEL_RULES: Record<string, string> = {
   fiverr:
-    'Fiverr. Buyers are comparing several sellers and the platform already provides milestones and payment protection. Stay on Fiverr for the whole job. Do not suggest moving to WhatsApp or paying outside the platform, because that breaches Fiverr terms and puts the account at risk. Keep the offer in the buyer request box or the order, and use the platform order for payment.',
+    'Fiverr messages are professional but relaxed, direct and focused on the work. Buyers compare several sellers, and the platform provides milestones and payment protection. Stay on Fiverr for the whole job and payment. Suggesting WhatsApp or outside payment breaches Fiverr terms and puts the account at risk. Keep the offer and payment in the Fiverr order.',
   instagram:
-    'Instagram direct message. Very short, no formatting, no links unless they asked for one. The first line decides whether it is read, so no greeting longer than one word.',
+    'Instagram DM. Ultra-casual, quick, friendly and short, like a real conversation on a phone. Use lowercase naturally when it fits, but do not force it. No formatting or links unless asked. Skip long greetings.',
   whatsapp:
-    'WhatsApp. Short and human, like texting. No lists, no headings, no email phrasing.',
+    'WhatsApp. Short, human and conversational, like texting. No lists, headings or email phrasing.',
   email:
-    'Email is the only place a short list or clear paragraphs are acceptable, and only when listing more than three concrete items. Otherwise write the same as a message. Subject lines stay plain and specific.',
-  tiktok: 'TikTok message. Assume they are on a phone and half reading. Two or three lines maximum.',
+    'Email. Clear, respectful and peer-to-peer. Keep it conversational and avoid corporate jargon. Use a short list only when more than three concrete items must be named.',
+  tiktok:
+    'TikTok DM. Ultra-casual, quick, friendly and brief. Use lowercase naturally when it fits. Assume they are reading on a phone.',
   call: 'The result will be spoken on a call. Short sentences that are easy to say out loud, no lists.',
   linkedin:
-    'LinkedIn. Professional but not stiff. Slightly more formal than Instagram, never salesy.',
-  upwork: 'Upwork. Like Fiverr: stay on the platform, keep the scope explicit.',
-  other: 'Keep it plain, short, and specific to the platform they wrote on.',
+    'LinkedIn DM. Clean, respectful and peer-to-peer. Professional but conversational, with no corporate jargon or sales pitch.',
+  upwork:
+    'Upwork messages are professional yet relaxed, direct and focused on the work. Keep the scope clear and the job on Upwork.',
+  other: 'The platform is not confirmed. Infer it only from clear conversation context. Otherwise use concise, neutral wording and do not assume platform-specific features or rules.',
 };
 
 /**
@@ -79,6 +81,7 @@ const CORE_RULES = [
   'Answer what they actually asked before anything else. If they asked about price, the reply is about price.',
   'When the message is about a method, a tool, a platform, a policy, a price or a strategy, and you are not certain, say what you need to check, and use research rather than guessing.',
   'Sound like a person: contractions, uneven sentence lengths, plain words. Never open with a compliment or with "great question".',
+  'Never sound salesy, eager, or desperate. No generic robotic transitions or corporate padding.',
   'No filler openings. They are removed before the message is used, so writing one wastes a generation.',
   'Ask only what you need to move forward, and explain in a few words why you are asking.',
   'Never spam. One message, one purpose. Follow up once, later, and only with something new to say.',
@@ -108,7 +111,7 @@ export type VoiceOptions = {
  */
 export function buildVoicePrompt(options: VoiceOptions = {}): string {
   const {
-    channel = 'instagram',
+    channel = 'other',
     source = null,
     tone = 'unknown',
     stage = 'lead',
@@ -231,8 +234,14 @@ export function buildVoicePrompt(options: VoiceOptions = {}): string {
       [
         '## Your job right now',
         '',
-        'Write the reply he should send to the most recent client message.',
-        'Reply to that message and nothing else. Then, if there is a clear next step towards the deal or the delivery, end on it naturally, inside the same short message.',
+        'Write one reply to the newest client message, using the whole saved conversation to continue the same discussion.',
+        'React to the specific thing they just said. Carry forward the actual topic, remember what Hamza already asked or sent, and do not repeat a question they already answered.',
+        'Keep it to one to three short sentences. Use plain, direct, low-friction language. Do not sound like a template, an advertisement, or an assistant.',
+        'Use simple present for state verbs. Never write phrases such as "are you currently needing", "are you wanting", or "are you requiring". Say "do you need", "do you want", or "are you looking for" instead.',
+        'Skip robotic transitions and formal filler, including "Having a mentor keeps you on the right track", "furthermore", "additionally", "utilize", "reach out", and "feel free to". Avoid stiff textbook grammar when a natural phrasing is clearer.',
+        'End with exactly one short, casual, direct question that is easy to answer and relevant to what they just said. Do not tack on a generic sales question.',
+        'Adapt to the selected platform. Use the platform rules above. When the platform is not selected but is clear from the conversation, match it. Do not guess when it is unclear.',
+        'Output only the raw message draft. No analysis, preamble, explanation, options, or quotation marks.',
       ].join('\n'),
     );
   }

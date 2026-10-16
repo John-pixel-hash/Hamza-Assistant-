@@ -13,7 +13,7 @@ import {
   mergeOverlappingMessages,
   type ChatScreenshotUpload,
 } from '@/lib/chat/capture-core';
-import { dedupeKey, pickThread } from '@/lib/chat/threads';
+import { dedupeKey, normaliseClientName, pickThread } from '@/lib/chat/threads';
 import { saveAssistantDraft } from '@/lib/chat/assistant-draft';
 import { CHANNEL_LABELS, type Channel } from '@/lib/domain';
 import { createClient } from '@/lib/supabase/server';
@@ -50,10 +50,6 @@ function asTone(value: string | null): Tone {
   if (!value) return 'unknown';
   const lowered = value.toLowerCase();
   return (TONES as string[]).includes(lowered) ? (lowered as Tone) : 'unknown';
-}
-
-function normalise(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
 type LoadedScreenshot = {
@@ -164,15 +160,24 @@ async function captureChatScreenshotsInner(
   }
 
   // Match an existing client before creating anything new.
-  const wanted = normalise(clientName);
+  const wanted = normaliseClientName(clientName);
   const { data: clients } = await supabase.from('clients').select('id, name, channel');
   const all = (clients ?? []) as { id: string; name: string; channel: string | null }[];
-  let client = all.find((candidate) => normalise(candidate.name) === wanted) ?? null;
+  let client = all.find((candidate) => normaliseClientName(candidate.name) === wanted) ?? null;
   if (!client) {
-    client = all.find((candidate) => {
-      const name = normalise(candidate.name);
-      return name.includes(wanted) || wanted.includes(name);
-    }) ?? null;
+    const partialMatches = all.filter((candidate) => {
+      const name = normaliseClientName(candidate.name);
+      return wanted.length >= 4 && (name.includes(wanted) || wanted.includes(name));
+    });
+    if (partialMatches.length === 1) client = partialMatches[0] ?? null;
+    if (partialMatches.length > 1) {
+      return {
+        ok: false,
+        error: 'I found more than one client with a similar name. Open the right client and continue its existing thread so the messages do not go to the wrong person.',
+        uploads: uploadList,
+        extracted: extraction.messages.map((message) => ({ role: message.role, text: message.text })),
+      };
+    }
   }
 
   let clientId: string;

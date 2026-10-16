@@ -55,6 +55,10 @@ would hand full database access to anyone who views the page source.
    2. `supabase/migrations/0002_storage.sql`
    3. `supabase/migrations/0003_phase2.sql`
    4. `supabase/migrations/0004_outreach_tracking.sql`
+   5. `supabase/migrations/0005_vector_search.sql`
+   6. `supabase/migrations/0006_user_secrets.sql`
+   7. `supabase/migrations/0007_project_research.sql`
+   8. `supabase/migrations/0008_tiktok_channel.sql`
 3. Confirm it worked. Open **Table Editor** and you should see `clients`, `messages`, `projects`, `playbooks` and the rest. Open **Storage** and you should see a private bucket named `attachments`.
 
 ### 1d. Close the door on public signups

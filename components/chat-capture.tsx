@@ -285,7 +285,7 @@ export function ChatCapture() {
     <div className="chat-capture-workspace flex flex-col justify-end">
       {!hasConversation && (
         <p className="mb-4 text-center text-[13px] text-ink-faint">
-          Choose up to 10 screenshots in conversation order. Reorder or remove them before sending. I will save new messages and the reply draft to the thread.
+          Choose up to 10 screenshots in conversation order. Reorder or remove them before sending. I will continue the matching client thread, add only new messages, and save one unsent reply draft.
         </p>
       )}
 

@@ -1,5 +1,6 @@
 import type { Channel, Stage } from '../domain';
 import { CHANNEL_LABELS, ROLE_LABELS, STAGE_LABELS } from '../domain';
+import { dedupeKey } from '../chat/threads';
 
 /**
  * Assembles what the model is told, from data that is already loaded.
@@ -124,6 +125,13 @@ export function assembleContext(input: ContextInput): AssembledContext {
 
   const kept = ordered.slice(-limit);
   const dropped = ordered.length - kept.length;
+  const incomingText = input.incoming?.trim() ?? '';
+  const latestKept = kept[kept.length - 1];
+  const incomingAlreadySaved = Boolean(
+    incomingText &&
+      latestKept?.role === 'client' &&
+      dedupeKey('client', latestKept.content) === dedupeKey('client', incomingText),
+  );
 
   const lines: string[] = [];
 
@@ -185,15 +193,15 @@ export function assembleContext(input: ContextInput): AssembledContext {
   const last = kept[kept.length - 1];
   const awaitingMyReply = Boolean(last && last.role === 'client');
 
-  if (input.incoming && input.incoming.trim() !== '') {
+  if (incomingText && !incomingAlreadySaved) {
     lines.push('');
     lines.push('## What they just sent, and what to reply to');
-    lines.push(trim(input.incoming));
+    lines.push(trim(incomingText));
   } else if (awaitingMyReply && last) {
     lines.push('');
     lines.push('## What to reply to');
     lines.push(
-      `The last message is theirs and has no reply yet. Reply to it: "${trim(last.content)}"`,
+      'The last message is theirs and has no reply yet. Reply to the last message above.'
     );
   } else if (last) {
     lines.push('');
@@ -202,10 +210,9 @@ export function assembleContext(input: ContextInput): AssembledContext {
     );
   }
 
-  if (kept.length > 0 || input.incoming) {
-    const channelName =
-      CHANNEL_LABELS[(input.channel ?? client.channel ?? 'instagram') as Channel] ??
-      String(input.channel ?? 'message');
+  if (kept.length > 0 || incomingText) {
+    const selectedChannel = input.channel ?? client.channel ?? 'other';
+    const channelName = CHANNEL_LABELS[selectedChannel as Channel] ?? String(selectedChannel);
     lines.push('');
     lines.push(`Reply on: ${channelName}.`);
   }
@@ -217,6 +224,6 @@ export function assembleContext(input: ContextInput): AssembledContext {
     droppedMessages: dropped,
     awaitingMyReply,
     currentStage: client.stage ?? 'lead',
-    currentChannel: String(input.channel ?? client.channel ?? 'instagram'),
+    currentChannel: String(input.channel ?? client.channel ?? 'other'),
   };
 }

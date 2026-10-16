@@ -129,38 +129,56 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
 
       </section>
 
-      {/* Start a thread */}
-      <section className="mt-5">
-        <NewThreadForm clientId={client.id} />
-      </section>
-
-      {/* Threads */}
-      <section className="mt-5">
-        <h2 className="h2 mb-3">Conversations</h2>
+      <section className="mt-5" aria-labelledby="client-conversations-title">
+        <div className="mb-3">
+          <h2 id="client-conversations-title" className="h2">Conversations</h2>
+          <p className="mt-1 text-[13px] muted">
+            Open the saved conversation to continue it. Start a separate thread only for a different topic.
+          </p>
+        </div>
         {threads.length === 0 ? (
-          <EmptyState
-            title="No conversation yet"
-            body="Start a thread above, then paste what the client sent you. Every message you save becomes memory the assistant can use."
-          />
+          <>
+            <EmptyState
+              title="No conversation saved yet"
+              body="Start one thread for this conversation, then keep adding its messages there."
+            />
+            <div className="mt-3">
+              <NewThreadForm clientId={client.id} />
+            </div>
+          </>
         ) : (
-          <ul className="card divide-y divide-line">
-            {threads.map((thread) => (
-              <li key={thread.id}>
-                <Link className="flex items-center justify-between gap-3 p-4" href={`/threads/${thread.id}`}>
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{thread.title}</p>
-                    <p className="text-[12px] text-ink-faint">
-                      {MODE_LABELS[thread.mode] ?? thread.mode} · {thread.message_count}{' '}
-                      {thread.message_count === 1 ? 'message' : 'messages'}
-                    </p>
-                  </div>
-                  <span className="shrink-0 text-[12px] text-ink-faint">
-                    {thread.last_message_at ? humaniseInterval(relativeInterval(thread.last_message_at)) : 'empty'}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="card divide-y divide-line">
+              {threads.map((thread, index) => (
+                <li key={thread.id}>
+                  <Link className="flex min-h-16 items-center justify-between gap-3 p-4" href={`/threads/${thread.id}`}>
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">
+                        {thread.title}
+                        {index === 0 && (
+                          <span className="ml-2 rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-semibold text-brand-ink">
+                            Most recent
+                          </span>
+                        )}
+                      </p>
+                      <p className="mt-0.5 text-[12px] text-ink-faint">
+                        {MODE_LABELS[thread.mode] ?? thread.mode} · {thread.message_count}{' '}
+                        {thread.message_count === 1 ? 'message' : 'messages'}
+                        {thread.draft_count > 0 && ` · ${thread.draft_count} saved draft${thread.draft_count === 1 ? '' : 's'}`}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-[13px] font-semibold text-brand-ink">Continue</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <details className="disclosure card mt-3">
+              <summary>Start a separate conversation thread</summary>
+              <div className="border-t border-line p-3">
+                <NewThreadForm clientId={client.id} />
+              </div>
+            </details>
+          </>
         )}
       </section>
 

@@ -62,6 +62,17 @@ export const BANNED_OPENERS = [
   'i hope this email finds you well',
 ];
 
+const STIFF_PHRASES = [
+  'furthermore',
+  'additionally',
+  'utilize',
+  'reach out',
+  'feel free to',
+  'having a mentor keeps you on the right track',
+];
+
+const STATE_VERB_PROGRESSIVE = /\b(?:are|is|am|was|were)\s+(?:(?:you|they|we|he|she|it|i)\s+)?(?:currently\s+)?(?:needing|wanting|requiring)\b/gi;
+
 /**
  * Chase messages. These are reported outright rather than softened, and the
  * reason is measured rather than assumed.
@@ -138,9 +149,16 @@ export type GuardActions = {
   chasePhrases: string[];
   /** Banned openers present after stripping. Should always be empty. */
   bannedOpeners: string[];
-  /** Questions asked in the draft. The user's rule is exactly one. */
+  /** Questions asked in the draft. The user's reply rule is exactly one. */
   questions: number;
   overQuestioned: boolean;
+  /** Reply drafts end with a question. */
+  missingClosingQuestion: boolean;
+  /** Reply drafts contain no more than three sentences. */
+  sentenceCount: number;
+  tooManySentences: boolean;
+  /** Corporate or awkward phrasing called out in the user's voice prompt. */
+  stiffPhrases: string[];
   /** True when the draft is formatted as a list. Rejected in a chat message. */
   hasListMarkers: boolean;
 };
@@ -253,6 +271,24 @@ export function countQuestions(text: string): number {
   return (text.match(/\?/g) ?? []).length;
 }
 
+/** Counts sentence-ending punctuation without splitting decimal prices. */
+export function countSentences(text: string): number {
+  const trimmed = text.trim();
+  if (!trimmed) return 0;
+  const endings = trimmed.match(/[.!?]+(?=\s|$)/g) ?? [];
+  const hasTerminalPunctuation = /[.!?]\s*$/.test(trimmed);
+  return endings.length + (hasTerminalPunctuation ? 0 : 1);
+}
+
+/** Finds the stiff phrases and state-verb constructions the owner banned. */
+export function findStiffPhrases(text: string): string[] {
+  const lowered = text.toLowerCase();
+  const found = STIFF_PHRASES.filter((phrase) => lowered.includes(phrase));
+  const progressive = [...text.matchAll(new RegExp(STATE_VERB_PROGRESSIVE.source, 'gi'))]
+    .map((match) => match[0].toLowerCase());
+  return [...new Set([...found, ...progressive])];
+}
+
 /**
  * True when the text is laid out as a list.
  *
@@ -269,6 +305,8 @@ export function hasListMarkers(text: string): boolean {
 
 export type EnforceOptions = {
   channel?: string;
+  /** Whether the strict one-to-three-sentence reply contract applies. */
+  requireReplyShape?: boolean;
   /** The message type, so a proposal is not held to a WhatsApp limit. */
   budget?: keyof typeof LENGTH_BUDGETS;
 };
@@ -281,7 +319,11 @@ export function enforceStyle(text: string, options: EnforceOptions = {}): GuardR
   const words = countWords(filler.text);
   const overBudgetBy = Math.max(0, words - budget.maxWords);
   const questions = countQuestions(filler.text);
+  const sentenceCount = countSentences(filler.text);
+  const requireReplyShape = options.requireReplyShape === true;
+  const closesWithQuestion = /\?\s*$/.test(filler.text);
   const listMarkers = hasListMarkers(filler.text);
+  const stiffPhrases = findStiffPhrases(filler.text);
 
   return {
     text: filler.text,
@@ -297,6 +339,10 @@ export function enforceStyle(text: string, options: EnforceOptions = {}): GuardR
       bannedOpeners: findBannedOpeners(filler.text),
       questions,
       overQuestioned: questions > 1,
+      missingClosingQuestion: requireReplyShape && (questions === 0 || !closesWithQuestion),
+      sentenceCount,
+      tooManySentences: requireReplyShape && sentenceCount > 3,
+      stiffPhrases,
       hasListMarkers: listMarkers,
     },
   };

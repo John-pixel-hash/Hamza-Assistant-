@@ -36,7 +36,7 @@ export function buildVisionPrompt(imageCount: number): string {
     'platform, and read the visible conversation exactly as written.',
     batchContext,
     'Answer with JSON only, in this exact shape:',
-    '{"platform": one of fiverr|email|whatsapp|instagram|call|linkedin|upwork|other|unknown,',
+    '{"platform": one of fiverr|email|whatsapp|instagram|tiktok|call|linkedin|upwork|other|unknown,',
     ' "client_name": the other person\'s visible display name or null,',
     ' "messages": [{"role": "client" or "me", "text": "...", "screenshot_indices": [1]}],',
     ' "tone": one word for how the client sounds, or null}',

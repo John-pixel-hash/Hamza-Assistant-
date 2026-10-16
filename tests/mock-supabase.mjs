@@ -81,6 +81,7 @@ export const FIXTURE = {
     mode: 'client_reply',
     status: 'open',
     client_id: '11111111-1111-4111-8111-111111111111',
+    updated_at: '2026-10-02T10:01:00Z',
   },
   messages: [
     {
@@ -105,7 +106,7 @@ export const FIXTURE = {
       id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       thread_id: '22222222-2222-4222-8222-222222222222',
       role: 'assistant',
-      content: 'I can meet you at 175 and start today.',
+      content: 'I can meet you at 175 and start today. Does that work for you?',
       channel: 'fiverr',
       sent_at: '2026-10-02T10:01:00Z',
       created_at: '2026-10-02T10:01:00Z',
@@ -310,6 +311,23 @@ const server = createServer(async (req, res) => {
   if (path.startsWith('/rest/v1/')) {
     const wantsSingleObject = (req.headers.accept ?? '').includes('vnd.pgrst.object+json');
 
+    if (path === '/rest/v1/rpc/client_messages' && req.method === 'POST') {
+      const body = await readBody(req);
+      if (body.p_client_id === FIXTURE.clientId) {
+        const rows = FIXTURE.messages.map((message) => ({
+          message_id: message.id,
+          thread_id: message.thread_id,
+          thread_title: FIXTURE.thread.title,
+          role: message.role,
+          channel: message.channel,
+          content: message.content,
+          sent_at: message.sent_at,
+        }));
+        return json(res, 200, rows.reverse());
+      }
+      return json(res, 200, []);
+    }
+
     if (req.method === 'HEAD') {
       res.writeHead(200, { 'content-range': '*/0', 'cache-control': 'no-store' });
       return res.end();
@@ -333,6 +351,10 @@ const server = createServer(async (req, res) => {
             channel: FIXTURE.client.channel,
           },
         });
+      }
+
+      if (table === 'threads' && url.searchParams.get('client_id') === `eq.${FIXTURE.clientId}`) {
+        return json(res, 200, [{ ...FIXTURE.thread, messages: FIXTURE.messages }]);
       }
 
       if (table === 'messages' && url.searchParams.get('thread_id') === `eq.${FIXTURE.threadId}`) {

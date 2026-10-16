@@ -22,8 +22,29 @@ test('the voice prompt carries every rule the owner set', async () => {
   assert.match(prompt, /Never spam/);
 
   // The Instagram rule, because Instagram is the channel in play.
-  assert.match(prompt, /Instagram direct message/);
+  assert.match(prompt, /Instagram DM/);
+  assert.match(prompt, /one to three short sentences/);
+  assert.match(prompt, /exactly one short, casual, direct question/);
+  assert.match(prompt, /Output only the raw message draft/);
   assert.ok(!prompt.includes('breaches Fiverr terms'), 'another platform rule must not leak in');
+});
+
+test('the requested platform voices are available without guessing an unspecified channel', async () => {
+  const { buildVoicePrompt } = await import('../lib/ai/voice.ts');
+  const { isChannel } = await import('../lib/domain.ts');
+  const tiktok = buildVoicePrompt({ channel: 'tiktok' });
+  const upwork = buildVoicePrompt({ channel: 'upwork' });
+  const linkedin = buildVoicePrompt({ channel: 'linkedin' });
+  const email = buildVoicePrompt({ channel: 'email' });
+  const unspecified = buildVoicePrompt();
+
+  assert.ok(isChannel('tiktok'), 'TikTok should be a supported, savable channel');
+  assert.match(tiktok, /TikTok DM\. Ultra-casual/);
+  assert.match(upwork, /professional yet relaxed/);
+  assert.match(linkedin, /peer-to-peer/);
+  assert.match(email, /peer-to-peer/);
+  assert.match(unspecified, /The platform is not confirmed/);
+  assert.doesNotMatch(unspecified, /Instagram DM/);
 });
 
 test('a Fiverr-sourced client keeps Fiverr rules wherever the chat happens', async () => {
@@ -201,6 +222,21 @@ test('history is trimmed from the oldest end, and the recent flow is kept in ord
     assert.ok(current > previous, 'messages must read oldest to newest');
   }
   assert.ok(!context.text.includes('message 24'), 'the oldest messages are the ones dropped');
+});
+
+test('a latest client message already in history is not appended a second time', async () => {
+  const { assembleContext } = await import('../lib/ai/context.ts');
+  const message = 'We have a few new enquiries.';
+  const context = assembleContext({
+    client: { id: 'c1', name: 'Simon' },
+    thread: { id: 't1' },
+    messages: [{ role: 'client', content: message, sent_at: '2026-10-03T10:00:00Z' }],
+    incoming: message,
+    channel: 'instagram',
+  });
+
+  assert.equal(context.text.split(message).length - 1, 1);
+  assert.match(context.text, /Reply to the last message above/);
 });
 
 test('a pasted client message becomes the thing being replied to', async () => {
