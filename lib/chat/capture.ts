@@ -43,7 +43,7 @@ export type ChatCaptureResult = {
 const TONES: Tone[] = ['casual', 'formal', 'short', 'detailed', 'warm', 'direct', 'unknown'];
 const SUPPORTED_IMAGE_MIMES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const CHAT_CAPTURE_DRAFT_DEADLINE_MS = 54000;
-const CHAT_CAPTURE_DRAFT_BUDGET_MS = 18000;
+const CHAT_CAPTURE_DRAFT_BUDGET_MS = 24000;
 const CHAT_CAPTURE_DRAFT_SETUP_RESERVE_MS = 3000;
 
 function asTone(value: string | null): Tone {
@@ -448,7 +448,7 @@ async function captureChatScreenshotsInner(
     draft = await draftReply({
       fast: true,
       budgetMs: draftBudgetMs,
-      attemptTimeoutMs: Math.min(10000, draftBudgetMs),
+      attemptTimeoutMs: Math.min(12000, draftBudgetMs),
       channel: platform,
       tone,
       purpose: 'reply',
