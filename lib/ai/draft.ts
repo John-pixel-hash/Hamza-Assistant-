@@ -8,9 +8,8 @@ import { getModelFor, modelFor } from './provider';
 import { classifyDraftError, isRetryableDraftError } from './draft-errors';
 import { DRAFT_FALLBACK_MODEL, modelChain, sleepMs } from './routing';
 
-// Drafts share the 60 second serverless window with everything else the
-// action does. The capture flow can request a shorter budget to leave time for
-// screenshot reading and saving; no caller can extend this hard limit.
+// A draft action has its own 60 second serverless window. Keep a hard 40 second
+// provider budget so there is time left for context loading, telemetry, and save.
 const DRAFT_BUDGET_MS = 40000;
 const DRAFT_ATTEMPT_TIMEOUT_MS = 14000;
 const DRAFT_BACKOFF_MS = 1500;
@@ -65,8 +64,8 @@ export async function draftReply(
   }
   request = { ...request, knowledge };
 
-  // The capture flow lives inside a 60 second serverless window, so it starts
-  // on the fast model. The reply panel keeps the primary voice.
+  // Latency-sensitive callers may opt into the fast free model. Screenshot
+  // capture now calls the reply action separately, with its own full budget.
   const startFast = request.fast === true && resolved.modelId !== DRAFT_FALLBACK_MODEL;
   const firstModelId = startFast ? DRAFT_FALLBACK_MODEL : resolved.modelId;
   let usedModel = startFast ? modelFor({ ...resolved, modelId: firstModelId }) : model;

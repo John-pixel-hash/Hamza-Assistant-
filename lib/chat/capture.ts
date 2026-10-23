@@ -1,11 +1,8 @@
+import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 
-import { draftReply } from '@/lib/ai/draft';
 import { readConversationScreenshots } from '@/lib/ai/vision';
 import type { Tone } from '@/lib/ai/voice';
-import { getClientDetail, getClientFacts } from '@/lib/data/clients';
-import { getClientProjectContext } from '@/lib/data/projects';
-import { getThread } from '@/lib/data/threads';
 import {
   MAX_CHAT_BATCH_BYTES,
   MAX_CHAT_IMAGE_BYTES,
@@ -14,7 +11,6 @@ import {
   type ChatScreenshotUpload,
 } from '@/lib/chat/capture-core';
 import { dedupeKey, normaliseClientName, pickThread } from '@/lib/chat/threads';
-import { saveAssistantDraft } from '@/lib/chat/assistant-draft';
 import { CHANNEL_LABELS, type Channel } from '@/lib/domain';
 import { createClient } from '@/lib/supabase/server';
 
@@ -25,7 +21,6 @@ export type ChatCaptureResult = {
   needsName?: boolean;
   platform?: string;
   clientName?: string | null;
-  reply?: string;
   clientId?: string;
   threadId?: string;
   createdClient?: boolean;
@@ -33,18 +28,17 @@ export type ChatCaptureResult = {
   threadTitle?: string;
   /** True once the screenshots are linked to saved thread messages. */
   conversationSaved?: boolean;
-  /** The generated reply is stored separately as an unsent assistant draft. */
-  draftSaved?: boolean;
-  draftSaveError?: string;
+  /** Signals the client to start a separate reply request after capture returns. */
+  draftPending?: boolean;
+  /** Unique key so repeated captures in the same thread each draft once. */
+  draftRunId?: string;
+  tone?: Tone;
   uploads?: ChatScreenshotUpload[];
   extracted?: { role: string; text: string }[];
 };
 
 const TONES: Tone[] = ['casual', 'formal', 'short', 'detailed', 'warm', 'direct', 'unknown'];
 const SUPPORTED_IMAGE_MIMES = new Set(['image/png', 'image/jpeg', 'image/webp']);
-const CHAT_CAPTURE_DRAFT_DEADLINE_MS = 54000;
-const CHAT_CAPTURE_DRAFT_BUDGET_MS = 24000;
-const CHAT_CAPTURE_DRAFT_SETUP_RESERVE_MS = 3000;
 
 function asTone(value: string | null): Tone {
   if (!value) return 'unknown';
@@ -59,13 +53,14 @@ type LoadedScreenshot = {
 };
 
 /**
- * An ordered screenshot set in, one ready-to-copy reply out.
+ * An ordered screenshot set in, a saved conversation out.
  *
- * The whole chain: download the private uploads, read them as one conversation,
- * match or create the client, keep one thread per platform, save messages and
- * link each image to the messages it shows, then draft once from the combined
- * history and save the result as an unsent assistant message. The capture action
- * keeps to a short model budget inside Vercel's 60-second Hobby serverless limit.
+ * This request downloads private uploads, reads them as one conversation,
+ * matches or creates the client, keeps one thread per platform, saves messages,
+ * and links each image to the messages it shows. Reply generation runs in a
+ * separate request with its own serverless time budget, so a slow free model
+ * cannot turn a successful conversation save into a failed capture or require
+ * the screenshots to be processed again for a retry.
  */
 type CaptureProgress = {
   conversationSaved: boolean;
@@ -83,7 +78,6 @@ async function captureChatScreenshotsInner(
   clientNameOverride: string | null | undefined,
   progress: CaptureProgress,
 ): Promise<ChatCaptureResult> {
-  const captureStartedAt = Date.now();
   const supabase = await createClient();
   const {
     data: { user },
@@ -395,8 +389,10 @@ async function captureChatScreenshotsInner(
   progress.conversationSaved = true;
 
   const addedMessages = fresh.length;
+  const tone = asTone(extraction.tone);
   const savedResult = {
     platform,
+    tone,
     clientName,
     clientId,
     threadId,
@@ -411,120 +407,14 @@ async function captureChatScreenshotsInner(
   revalidatePath(`/clients/${clientId}`);
   revalidatePath(`/threads/${threadId}`);
 
-  const detail = await getThread(threadId, { withAttachments: false });
-  if (!detail) {
-    return {
-      ok: false,
-      error: 'The thread disappeared while I was working.',
-      ...savedResult,
-    };
-  }
-  const [clientResult, facts, projects] = await Promise.all([
-    getClientDetail(clientId),
-    getClientFacts(clientId),
-    getClientProjectContext(clientId),
-  ]);
-  const clientRow = clientResult.client;
-
-  const tone = asTone(extraction.tone);
-  const remainingActionMs = CHAT_CAPTURE_DRAFT_DEADLINE_MS - (Date.now() - captureStartedAt);
-  const draftBudgetMs = Math.min(
-    CHAT_CAPTURE_DRAFT_BUDGET_MS,
-    remainingActionMs - CHAT_CAPTURE_DRAFT_SETUP_RESERVE_MS,
-  );
-  if (draftBudgetMs < 1000) {
-    return {
-      ok: false,
-      error: 'The conversation is saved, but I ran out of time to draft here. Open the saved thread to write the reply.',
-      ...savedResult,
-    };
-  }
-
-  // The memory pass deliberately does not run here. It has its own route that
-  // the browser fires right after the reply lands, keeping this action in the
-  // 60-second serverless time box.
-  let draft;
-  try {
-    draft = await draftReply({
-      fast: true,
-      budgetMs: draftBudgetMs,
-      attemptTimeoutMs: Math.min(12000, draftBudgetMs),
-      channel: platform,
-      tone,
-      purpose: 'reply',
-      instruction: null,
-      context: {
-        client: {
-          id: clientRow?.id ?? clientId,
-          name: clientRow?.name ?? clientName,
-          company: clientRow?.company ?? null,
-          country: clientRow?.country ?? null,
-          stage: clientRow?.stage ?? 'lead',
-          source: clientRow?.source ?? null,
-          channel: clientRow?.channel ?? platform,
-          currency: clientRow?.currency ?? null,
-          deal_value_estimate: clientRow?.deal_value_estimate ?? null,
-          summary: clientRow?.summary ?? null,
-          notes: clientRow?.notes ?? null,
-        },
-        thread: { id: detail.thread.id, title: detail.thread.title, mode: detail.thread.mode },
-        messages: detail.messages.map((message) => ({
-          role: message.role,
-          content: message.content,
-          sent_at: message.sent_at ?? message.created_at,
-          channel: message.channel,
-        })),
-        facts: facts.map((fact) => ({ key: fact.key, value: fact.value, confidence: fact.confidence })),
-        projects,
-        incoming: null,
-        channel: platform,
-      },
-    });
-  } catch (error) {
-    console.error('[chat] draft failed', error instanceof Error ? error.message : error);
-    return {
-      ok: false,
-      error: 'I saved the conversation, but could not finish the reply just now. Open the saved thread and use its reply panel or try again.',
-      ...savedResult,
-    };
-  }
-
-  const reply = draft.text.trim();
-  if (!reply) {
-    return {
-      ok: false,
-      error: 'I saved the conversation but the reply came back empty. Open the saved thread and use its reply panel.',
-      ...savedResult,
-    };
-  }
-
-  let draftSaved = false;
-  let draftSaveError: string | undefined;
-  try {
-    const savedDraft = await saveAssistantDraft(supabase, {
-      userId: user.id,
-      threadId,
-      content: reply,
-      channel: platform,
-      source: 'screenshot_capture',
-      outcome: draft,
-    });
-    if (savedDraft.error) {
-      console.error('[chat] assistant draft save failed', savedDraft.error);
-      draftSaveError = 'The reply is ready, but I could not save it to the thread. Copy it before you leave.';
-    } else {
-      draftSaved = true;
-      revalidatePath(`/threads/${threadId}`);
-      revalidatePath(`/clients/${clientId}`);
-      revalidatePath('/clients');
-      revalidatePath('/');
-    }
-  } catch (saveError) {
-    console.error('[chat] assistant draft save failed', saveError instanceof Error ? saveError.message : saveError);
-    draftSaveError = 'The reply is ready, but I could not save it to the thread. Copy it before you leave.';
-  }
-
-  return { ok: true, reply, draftSaved, draftSaveError, ...savedResult };
+  // The client starts drafting only after this save action returns. A retry then
+  // uses the saved thread and does not re-run screenshot reading or insert rows.
+  return {
+    ok: true,
+    ...savedResult,
+    draftPending: true,
+    draftRunId: randomUUID(),
+  };
 }
 
 /** Convert unexpected network or provider failures into a recoverable form state. */
@@ -540,7 +430,7 @@ export async function captureChatScreenshots(
     return {
       ok: false,
       error: progress.conversationSaved
-        ? 'The conversation and screenshots were saved, but the reply could not be finished. Open Clients and use the reply panel.'
+        ? 'The conversation and screenshots were saved, but capture did not finish. Open the saved thread to continue.'
         : 'I could not finish this capture. Your screenshots are still selected. Try again.',
       conversationSaved: progress.conversationSaved,
       clientId: progress.clientId,

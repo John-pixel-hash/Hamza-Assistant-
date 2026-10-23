@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useActionState, useEffect, useRef, useState } from 'react';
 
 import { chatCaptureAction } from '@/app/actions/chat';
+import { draftReplyAction } from '@/app/actions/drafts';
+import { EMPTY_DRAFT_STATE } from '@/lib/ai/draft-state';
 import { EMPTY_CHAT_STATE } from '@/lib/chat/state';
 import {
   MAX_CHAT_BATCH_BYTES,
@@ -41,6 +43,7 @@ const IMAGE_EXTENSIONS: Record<string, string> = {
  */
 export function ChatCapture() {
   const [state, formAction, pending] = useActionState(chatCaptureAction, EMPTY_CHAT_STATE);
+  const [draftState, draftFormAction, drafting] = useActionState(draftReplyAction, EMPTY_DRAFT_STATE);
   const [upload, setUpload] = useState<UploadState>({
     uploading: false,
     uploadingCount: 0,
@@ -51,6 +54,9 @@ export function ChatCapture() {
   const [copied, setCopied] = useState(false);
   const [selectionChanged, setSelectionChanged] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const draftFormRef = useRef<HTMLFormElement>(null);
+  const startedDraftRun = useRef<string | null>(null);
+  const rememberedRun = useRef<string | null>(null);
   const previewUrls = useRef(new Set<string>());
 
   const selectedUploads: UploadedScreenshot[] = upload.touched
@@ -254,9 +260,9 @@ export function ChatCapture() {
   }
 
   async function copyReply() {
-    if (!state.reply) return;
+    if (!draftState.draft) return;
     try {
-      await navigator.clipboard.writeText(state.reply);
+      await navigator.clipboard.writeText(draftState.draft);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -264,16 +270,39 @@ export function ChatCapture() {
     }
   }
 
-  // Remember second: the pass runs in its own request, outside the capture's
-  // serverless time box. Fire and forget; the reply never waits for it.
+  // Draft only after screenshot reading and message saving have completed.
+  // Each saved capture gets one automatic attempt, even when the same thread is
+  // captured again later. Manual retries use the same hidden form.
   useEffect(() => {
-    if (!state.ok || !state.threadId) return;
+    if (!state.ok || !state.draftPending || !state.threadId || !state.draftRunId) return;
+    if (startedDraftRun.current === state.draftRunId) return;
+    startedDraftRun.current = state.draftRunId;
+    draftFormRef.current?.requestSubmit();
+  }, [state.ok, state.draftPending, state.threadId, state.draftRunId]);
+
+  // Memory runs after the separate draft attempt, in its own request. It cannot
+  // consume the capture or draft time budget.
+  useEffect(() => {
+    if (!state.ok || !state.threadId || drafting) return;
+    if (state.draftPending && !draftState.draft && !draftState.error && !draftState.draftSaveError) return;
+    const runKey = state.draftRunId ?? state.threadId;
+    if (rememberedRun.current === runKey) return;
+    rememberedRun.current = runKey;
     fetch('/api/chat-memory', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ threadId: state.threadId }),
     }).catch(() => undefined);
-  }, [state.ok, state.threadId]);
+  }, [
+    state.ok,
+    state.threadId,
+    state.draftPending,
+    state.draftRunId,
+    drafting,
+    draftState.draft,
+    draftState.error,
+    draftState.draftSaveError,
+  ]);
 
   const platformLabel =
     state.platform && state.platform !== 'unknown'
@@ -312,7 +341,7 @@ export function ChatCapture() {
               <span>·</span>
               <span>
                 {state.addedMessages === 0
-                  ? 'nothing new to add, drafted from history'
+                  ? 'no new messages, using saved history'
                   : state.addedMessages === 1
                     ? '1 new message added'
                     : `${state.addedMessages} new messages added`}
@@ -339,24 +368,32 @@ export function ChatCapture() {
           <div className="flex justify-end">
             <p className="rounded-2xl rounded-br-md bg-brand/10 px-4 py-2.5 text-[13px] text-ink-faint" role="status">
               {selectedUploads.length > 0
-                ? `Reading ${selectedUploads.length} screenshot${selectedUploads.length === 1 ? '' : 's'} and writing...`
-                : 'Reading the conversation and writing...'}
+                ? `Reading ${selectedUploads.length} screenshot${selectedUploads.length === 1 ? '' : 's'}...`
+                : 'Reading the conversation...'}
             </p>
           </div>
         )}
 
-        {state.ok && state.reply && (
+        {state.ok && state.draftPending && !draftState.draft && !draftState.error && !draftState.draftSaveError && (
+          <div className="flex justify-end">
+            <p className="rounded-2xl rounded-br-md bg-brand/10 px-4 py-2.5 text-[13px] text-ink-faint" role="status">
+              {drafting ? 'Conversation saved. Writing your reply...' : 'Conversation saved. Preparing your reply...'}
+            </p>
+          </div>
+        )}
+
+        {state.ok && draftState.draft && (
           <div className="flex flex-col items-end">
             <p className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-brand px-4 py-2.5 text-[14px] text-white">
-              {state.reply}
+              {draftState.draft}
             </p>
-            {state.draftSaved ? (
+            {draftState.draftSaved ? (
               <p className="mt-2 text-[12px] text-brand-ink" role="status">
-                Draft saved to the thread. Nothing has been sent.
+                Unsent draft saved to the thread. Nothing has been sent.
               </p>
             ) : (
               <div className="alert alert-warn mt-2 max-w-[85%]" role="alert">
-                {state.draftSaveError ?? 'The reply is ready, but it is not saved to the thread yet. Copy it before you leave.'}
+                {draftState.draftSaveError ?? 'The reply is ready, but it is not saved to the thread yet. Copy it before you leave.'}
               </div>
             )}
             <div className="mt-2 flex flex-wrap justify-end gap-2">
@@ -383,7 +420,37 @@ export function ChatCapture() {
             </div>
           </div>
         )}
+
+        {state.ok && draftState.error && !draftState.draft && (
+          <div className="alert alert-error flex flex-wrap items-center justify-between gap-3" role="alert">
+            <p>{draftState.error} The conversation is saved. Nothing was sent.</p>
+            <div className="flex flex-wrap gap-2">
+              <button className="btn btn-quiet btn-small" type="button" onClick={() => draftFormRef.current?.requestSubmit()} disabled={drafting}>
+                {drafting ? 'Trying again...' : 'Retry reply'}
+              </button>
+              {state.threadId && (
+                <Link className="btn btn-quiet btn-small" href={`/threads/${state.threadId}`}>
+                  Open thread
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
       </div>
+
+      <form ref={draftFormRef} action={draftFormAction} hidden aria-hidden="true">
+        <input name="thread_id" type="hidden" value={state.threadId ?? ''} readOnly />
+        <input
+          name="channel"
+          type="hidden"
+          value={state.platform && state.platform !== 'unknown' ? state.platform : 'other'}
+          readOnly
+        />
+        <input name="tone" type="hidden" value={state.tone ?? 'unknown'} readOnly />
+        <input name="incoming" type="hidden" value="" readOnly />
+        <input name="instruction" type="hidden" value="" readOnly />
+        <button type="submit" tabIndex={-1}>Write reply</button>
+      </form>
 
       {!state.ok && (
         <form
